@@ -1,13 +1,14 @@
 use core::cell::RefCell;
 
 use bh1730fvc::{blocking::BH1730FVC};
-use defmt::info;
 use embassy_time::{Delay, Timer};
 use embedded_hal_bus::i2c::RefCellDevice;
+use embedded_hal_compat::ReverseCompat;
 use esp_hal::{analog::adc::AdcChannel, gpio::Output, i2c::master::I2c, Blocking};
 use edge_protocol::Measurement;
+
 use crate::battery::BatteryMeasurement;
-use crate::anyhow_utils::*;
+use crate::utils::anyhow::ResultAny;
 use crate::moisture::SoilSensor;
 
 pub struct Gauge<'a, P : AdcChannel> {
@@ -38,8 +39,7 @@ impl <'a, P : AdcChannel> Gauge<'a, P> {
 
         let mut delay = Delay;
 
-        let mut i2c_pcb_sht = RefCellDevice::new(&self.i2c_pcb);
-        let mut i2c_pcb_bh1730fvc = RefCellDevice::new(&self.i2c_pcb);
+        let mut i2c_pcb_bh1730fvc = RefCellDevice::new(&self.i2c_pcb).reverse();
         let mut i2c_ext_moisture = RefCellDevice::new(&self.i2c_ext);
 
         let mut soil = SoilSensor::new(&mut i2c_ext_moisture);
@@ -50,12 +50,12 @@ impl <'a, P : AdcChannel> Gauge<'a, P> {
 
         let soil_pf = soil.read().await.with_anyhow("Unable to read soil")?;
 
-        let mut sht = shtcx::blocking::shtc3(RefCellDevice::new(&self.i2c_pcb));
-        
         let mut bh1730fvc = BH1730FVC::new(&mut delay, &mut i2c_pcb_bh1730fvc)
             .with_anyhow("BH1730FVC init failed")?;
-        
-        sht.start_measurement(shtcx::blocking::PowerMode::NormalMode)
+
+        let mut sht = shtcx2::shtc3(RefCellDevice::new(&self.i2c_pcb));
+
+        sht.start_measurement(shtcx2::PowerMode::NormalMode)
             .with_anyhow("SHT start measurement failed")?;
 
         bh1730fvc.set_mode(bh1730fvc::Mode::SingleShot, &mut i2c_pcb_bh1730fvc)
@@ -63,7 +63,8 @@ impl <'a, P : AdcChannel> Gauge<'a, P> {
 
         Timer::after_millis(150).await;
 
-        let lux = bh1730fvc.read_ambient_light_intensity(&mut i2c_pcb_sht).with_anyhow("BH1730FVC read failed")?;
+        let lux = bh1730fvc.read_ambient_light_intensity(&mut i2c_pcb_bh1730fvc).with_anyhow("BH1730FVC read failed")?;
+
         let battery = self.bm.sample();
         
         let measurement = sht.get_measurement_result().with_anyhow("SHT read failed")?;

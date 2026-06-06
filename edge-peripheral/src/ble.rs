@@ -1,111 +1,107 @@
-use core::cell::UnsafeCell;
-use defmt::{info, warn, error, Debug2Format};
 use embassy_futures::select::select;
-use embassy_time::{Delay, Duration, Timer};
-use esp_hal::rtc_cntl::Rtc;
+
 use trouble_host::prelude::*;
-use trouble_host::types::gatt_traits::FromGattError;
+use trouble_host::types::gatt_traits::FromGatt;
+use trouble_host::BleHostError;
+use edge_protocol::gatt as _;
+use edge_protocol::v2::*;
+use edge_protocol::v2::measurements_to_events;
+use edge_protocol::v2_proto::{Events, PlantProfile, SyncState, Timestamp};
+use esp_hal::rtc_cntl::Rtc;
+use log::*;
 
-use edge_protocol::*;
-use heapless::Vec;
-
-pub type MeasurementSerieEntryVec = Vec<MeasurementSerieEntry, 6>;
+use crate::state::Measurements;
+use crate::utils::rtc::RtcExt;
 
 /// Max number of connections
 const CONNECTIONS_MAX: usize = 1;
-
 /// Max number of L2CAP channels.
 const L2CAP_CHANNELS_MAX: usize = 2; // Signal + att
+const L2CAP_MTU: usize = 512;
 
-const L2CAP_MTU: usize = 255;
-
-// Thread-local buffer for preparing GATT data
-struct SyncUnsafeCell<T>(UnsafeCell<T>);
-
-unsafe impl<T> Sync for SyncUnsafeCell<T> {}
-
-static GATT_BUFFER: SyncUnsafeCell<[u8; 234]> =
-    SyncUnsafeCell(UnsafeCell::new([0; 234]));
-
-
-pub struct MeasurementSeries(MeasurementSerieEntryVec);
-
-
-impl Default for MeasurementSeries {
-    fn default() -> Self {
-        Self(Vec::new())
-    }
+#[gatt_service(uuid = STATION_SERVICE_UUID_16)]
+struct StationService {
+    #[characteristic(uuid = STATION_MAC_ADDR_CHARACTERISTIC_UUID_16, read)]
+    address: [u8; 6],
+    #[characteristic(uuid = STATION_EVENTS_CHARACTERISTIC_UUID_16, read)]
+    events: Events,
+    #[characteristic(uuid = STATION_PLANT_PROFILE_CHARACTERISTIC_UUID_16, read, write)]
+    current_profile: PlantProfile,
+    #[characteristic(uuid = STATION_CURRENT_TIME_CHARACTERISTIC_UUID_16, read, write)]
+    current_time: Timestamp,
+    #[characteristic(uuid = STATION_SYNC_STATE_CHARACTERISTIC_UUID_16, read, write)]
+    sync_state: SyncState
 }
 
-impl AsGatt for MeasurementSeries {
-    fn as_gatt(&self) -> &[u8] {
-        let buffer = unsafe { &mut *GATT_BUFFER.0.get() };
-
-        for (i, item) in self.0.iter().enumerate() {
-            buffer[i * 39..(i + 1) * 39].copy_from_slice(&item.to_tlv());
-        }
-
-        unsafe { core::slice::from_raw_parts(buffer.as_ptr(), 234) }
-
-    }
-    const MIN_SIZE: usize = 234;
-    const MAX_SIZE: usize = 234;
-}
-
-impl FromGatt for MeasurementSeries {
-    fn from_gatt(data: &[u8]) -> Result<Self, FromGattError> {
-        let mut measurements = Vec::<MeasurementSerieEntry, 6>::new();
-        for i in 0..6 {
-            let start = i * 33;
-            let end = start + 33;
-            let segment = &data[start..end];
-
-            let entry = MeasurementSerieEntry::from_tlv(segment).map_err(|_| FromGattError::InvalidLength)?;
-            if measurements.push(entry).is_err() {
-                break;
-            }
-        }
-
-        Ok(MeasurementSeries(measurements))
+impl StationService {
+    fn merge_into(&self, server: &Server<'_>, base: &StationState) -> Result<StationState, Error> {
+        Ok(StationState {
+            mac: base.mac,
+            events: self.events.get(&server)?,
+            current_profile: self.current_profile.get(&server)?,
+            current_time: self.current_time.get(&server)?,
+        })
     }
 }
 
 #[gatt_server]
 struct Server {
-    address_service: AddressService,
-    time_service: TimeService,
-    measurement_service: MeasurementService
+    station_service: StationService
 }
 
-#[gatt_service(uuid = ADDRESS_SERVICE_UUID_16)]
-struct AddressService {
-    #[characteristic(uuid = ADDRESS_CHARACTERISTIC_UUID_16, read)]
-    address: [u8; 6]
+#[derive(Debug)]
+pub struct StationState {
+    pub mac: [u8; 6],
+    pub events: Events,
+    pub current_profile: PlantProfile,
+    pub current_time: Timestamp
+}
+impl StationState {
+    pub fn init_with_mac(mac: [u8; 6]) -> Self {
+        Self {
+            mac,
+            events: Events::default(),
+            current_profile: PlantProfile::default(),
+            current_time: Timestamp::default(),
+        }
+    }
+
+    pub fn from_measurements(mac: [u8; 6], measurements: &Measurements) -> Result<Self, ()> {
+        Ok(Self {
+            mac,
+            events: measurements_to_events(measurements)?,
+            current_profile: PlantProfile::default(),
+            current_time: Timestamp::default(),
+        })
+    }
+
+    fn to_service(&self, server: &Server<'_>) -> Result<(), Error> {
+        server.station_service.address.set(&server, &self.mac)?;
+        server.station_service.events.set(&server, &self.events)?;
+        server
+            .station_service
+            .current_time
+            .set(&server, &self.current_time)?;
+        Ok(())
+    }
 }
 
-/// Time service
-#[gatt_service(uuid = BluetoothUuid16::new(CURRENT_TIME_SERVICE_UUID))]
-struct TimeService {
-    #[characteristic(uuid = BluetoothUuid16::new(CURRENT_TIME_CHARACTERISTIC_UUID), write, read)]
-    current_time: [u8; 10]
-}
-
-
-#[gatt_service(uuid = MEASUREMENT_SERVICE_UUID_16)]
-struct MeasurementService {
-    #[characteristic(uuid = MEASUREMENT_CHARACTERISTIC_UUID_16, read)]
-    measurement: MeasurementSeries
-}
-
-/// Run the BLE stack.
-pub async fn run<C>(controller: C, rtc: &mut Rtc<'_>, address: [u8; 6], measurements: MeasurementSerieEntryVec)
+/// Run the BLE stack. Pass `Some(rtc)` during `AwaitingTimeSync` to apply central time writes.
+pub async fn run<C>(
+    controller: C,
+    state: &StationState,
+    rtc: Option<&Rtc<'_>>,
+) -> Result<StationState, Error>
 where
-    C: Controller,
+    C: Controller
 {
+    // Using a fixed "random" address can be useful for testing. In real scenarios, one would
+    // use e.g. the MAC 6 byte array as the address (how to get that varies by the platform).
+    let address: Address = Address::random(state.mac);
+    info!("Our address = {:?}", address);
 
-    let mut resources: HostResources<CONNECTIONS_MAX, L2CAP_CHANNELS_MAX, L2CAP_MTU> = HostResources::new();
-    let address_ = Address::random([0xff, 0x8f, 0x1b, 0x05, 0xe4, 0xff]);
-    let stack = trouble_host::new(controller, &mut resources).set_random_address(address_);
+    let mut resources: HostResources<DefaultPacketPool, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> = HostResources::new();
+    let stack = trouble_host::new(controller, &mut resources).set_random_address(address);
     let Host {
         mut peripheral, runner, ..
     } = stack.build();
@@ -113,146 +109,164 @@ where
     info!("Starting advertising and GATT service");
     let server = Server::new_with_config(GapConfig::Peripheral(PeripheralConfig {
         name: "Mycelium",
-        appearance: &appearance::UNKNOWN,
+        appearance: &appearance::power_device::GENERIC_POWER_DEVICE,
     }))
-    .expect("Unable to start GATT service");
+    .unwrap();
 
-    info!("Starting adv and event loop");
-    
-    let _ = select(ble_task(runner), async {
-        
-        info!("Advertising...");
+    state.to_service(&server).expect("Unable to set state");
 
-        match advertise("Mycelium", &mut peripheral, &server).await {
-            Ok(conn) => {
-                info!("Got gatt connection");
-                match gatt_events_task(&server, &conn, rtc, address, measurements.clone()).await {
-                    Ok(_) => (),
-                    Err(e) => {
-                        let e = defmt::Debug2Format(&e);
-                        error!("[adv] error: {:?}", e);
-                    }
-                }
-            }
-            Err(e) => {
-                let e = defmt::Debug2Format(&e);
-                panic!("[adv] error: {:?}", e);
-            }
-        }
+    // let mac_address = heapless::Vec::from_array(mac);
+    // server.station_service.address.set(&server, &MacAddress { mac_address });
 
-        
+    let res = select(ble_task(runner), async {
+        let conn = advertise("Mycelium", &mut peripheral, &server)
+            .await
+            .map_err(|e| match e {
+                BleHostError::BleHost(err) => err,
+                _ => Error::InvalidState,
+            })?;
+        gatt_events_task(&server, &conn, state, rtc).await?;
+        server.station_service.merge_into(&server, state)
     })
     .await;
+
+    match res {
+        embassy_futures::select::Either::Second(Ok(res)) => Ok(res),
+        _ => Err(Error::InvalidState)
+    }
 }
 
-
-async fn ble_task<C: Controller>(mut runner: Runner<'_, C>) {
+async fn ble_task<C: Controller, P: PacketPool>(mut runner: Runner<'_, C, P>) {
     loop {
         if let Err(e) = runner.run().await {
-            let e = defmt::Debug2Format(&e);
-            panic!("[ble_task] error: {:?}", e);
+            error!("[ble_task] error: {:?}", e);
         }
     }
 }
 
-// Stream Events until the connection closes.
-///
-/// This function will handle the GATT events and process them.
-/// This is how we interact with read and write requests.
-async fn gatt_events_task(server: &Server<'_>, conn: &GattConnection<'_, '_>, rtc: &mut Rtc<'_>, address: [u8; 6], measurements: MeasurementSerieEntryVec) -> Result<(), Error> {
+/// Create an advertiser to use to connect to a BLE Central, and wait for it to connect.
+async fn advertise<'values, 'server, C: Controller>(
+    name: &'values str,
+    peripheral: &mut Peripheral<'values, C, DefaultPacketPool>,
+    server: &'server Server<'values>,
+) -> Result<GattConnection<'values, 'server, DefaultPacketPool>, BleHostError<C::Error>> {
+    let service_uuid = STATION_SERVICE_UUID_16.to_le_bytes();
 
-    let series = MeasurementSeries(measurements.clone());
-    server.measurement_service.measurement.set(&server, &series).map_err(|_e| Error::Other);
-    server.address_service.address.set(&server, &address).map_err(|_e| Error::Other);
+    // Primary adv: flags + service UUID (required for service-filtered scans on many centrals).
+    let mut adv_data = [0u8; 31];
+    let adv_len = AdStructure::encode_slice(
+        &[
+            AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
+            AdStructure::ServiceUuids16(&[service_uuid]),
+        ],
+        &mut adv_data[..],
+    )?;
+
+    // Scan response: name + service UUID again for stacks that only inspect scan rsp.
+    let mut scan_data = [0u8; 31];
+    let scan_len = AdStructure::encode_slice(
+        &[
+            AdStructure::CompleteLocalName(name.as_bytes()),
+            AdStructure::ServiceUuids16(&[service_uuid]),
+        ],
+        &mut scan_data[..],
+    )?;
+
+    let advertiser = peripheral
+        .advertise(
+            &Default::default(),
+            Advertisement::ConnectableScannableUndirected {
+                adv_data: &adv_data[..adv_len],
+                scan_data: &scan_data[..scan_len],
+            },
+        )
+        .await?;
+    info!("[adv] advertising as {name} (service 0x{STATION_SERVICE_UUID_16:04x})");
+    let conn = advertiser.accept().await?.with_attribute_server(server)?;
+    info!("[adv] connection established");
+    Ok(conn)
+}
+
+async fn gatt_events_task<P: PacketPool>(
+    server: &Server<'_>,
+    conn: &GattConnection<'_, '_, P>,
+    state: &StationState,
+    rtc: Option<&Rtc<'_>>,
+) -> Result<(), Error> {
+    server.station_service.address.set(server, &state.mac)?;
+    server.station_service.events.set(server, &state.events)?;
+
+    if rtc.is_some() {
+        server
+            .station_service
+            .sync_state
+            .set(server, &SyncState::Ready)?;
+    }
 
     let reason = loop {
         match conn.next().await {
-            GattConnectionEvent::Gatt { event: Err(e) } => warn!("[gatt] error processing event: {:?}", e),
-            GattConnectionEvent::Gatt { event: Ok(event_) } => {
-                
-                match &event_ {
-                    GattEvent::Read(event) => {
-                        if event.handle() == server.measurement_service.measurement.handle {
-                            info!("[gatt] Read Event to measurement Characteristic");
-                            match event_.accept() {
-                                Ok(reply) => {
-                                    reply.send().await;
-                                    Timer::after_millis(300).await;
-                                    break
-                                },
-                                Err(e) => warn!("[gatt] error sending response: {:?}", e),
-                            };
-                        } else if event.handle() == server.time_service.current_time.handle {
-                            info!("[gatt] Read Event to current time Characteristic");
-                            let now = rtc.current_time();
-                            let ct = CurrentTime::from_naivedatetime(now);
-                            let value = ct.to_bytes();
-                            server.time_service.current_time.set(&server, &value).expect("Unable to set the time");
-                            match event_.accept() {
-                                Ok(reply) => reply.send().await,
-                                Err(e) => warn!("[gatt] error sending response: {:?}", e),
-                            }
-                        } else {
-                            match event_.accept() {
-                                Ok(reply) => reply.send().await,
-                                Err(e) => warn!("[gatt] error sending response: {:?}", e),
+            GattConnectionEvent::Disconnected { reason } => break reason,
+            GattConnectionEvent::Gatt { event } => {
+                let reply = match event {
+                    GattEvent::Write(write) => {
+                        if let Some(rtc) = rtc {
+                            handle_gatt_write(server, rtc, &write)?;
+                        }
+                        write.accept()?
+                    }
+                    GattEvent::Read(read) => {
+                        if let Some(rtc) = rtc {
+                            if read.handle() == server.station_service.current_time.handle {
+                                refresh_current_time(server, rtc)?;
                             }
                         }
-
-                        
+                        read.accept()?
                     }
-                    GattEvent::Write(event) => {
-                        if event.handle() == server.time_service.current_time.handle {
-                            let bytes = event.data();
-                            let ct = CurrentTime::from_bytes(&bytes);
-                             info!("[gatt] Write Event to current time Characteristic: {:?}", Debug2Format(&ct));
-
-                            rtc.set_current_time(ct.to_naivedatetime());
-                            match event_.accept() {
-                                Ok(reply) => reply.send().await,
-                                Err(e) => warn!("[gatt] error sending response: {:?}", e),
-                            };
-                        }
-                    }
+                    other => other.accept()?,
                 };
+                reply.send().await;
             }
-            _ => {} // ignore other Gatt Connection Events
+            _ => {}
         }
     };
     info!("[gatt] disconnected: {:?}", reason);
     Ok(())
 }
 
+fn refresh_current_time(server: &Server<'_>, rtc: &Rtc<'_>) -> Result<(), Error> {
+    let secs = (rtc.current_time_us() / 1_000_000) as u32;
+    server
+        .station_service
+        .current_time
+        .set(server, &Timestamp { timestamp: secs })
+}
 
-/// Create an advertiser to use to connect to a BLE Central, and wait for it to connect.
-async fn advertise<'values, 'server, C: Controller>(
-    name: &'values str,
-    peripheral: &mut Peripheral<'values, C>,
-    server: &'server Server<'values>,
-) -> Result<GattConnection<'values, 'server>, BleHostError<C::Error>> {
-    let mut advertiser_data = [0; 31];
-    let len = AdStructure::encode_slice(
-        &[
-            AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
-            AdStructure::ServiceUuids16(&[
-                CURRENT_TIME_SERVICE_UUID.to_le_bytes(), 
-                MEASUREMENT_SERVICE_UUID_16.to_le_bytes()
-            ]),
-            AdStructure::CompleteLocalName(name.as_bytes()),
-        ],
-        &mut advertiser_data[..],
-    )?;
-    let advertiser = peripheral
-        .advertise(
-            &Default::default(),
-            Advertisement::ConnectableScannableUndirected {
-                adv_data: &advertiser_data[..len],
-                scan_data: &[],
-            },
-        )
-        .await?;
-    info!("[adv] advertising");
-    let conn = advertiser.accept().await?.with_attribute_server(server)?;
-    info!("[adv] connection established");
-    Ok(conn)
+fn handle_gatt_write<P: PacketPool>(
+    server: &Server<'_>,
+    rtc: &Rtc<'_>,
+    write: &WriteEvent<'_, '_, P>,
+) -> Result<(), Error> {
+    if write.handle() == server.station_service.current_time.handle {
+        let ts: Timestamp = write
+            .value(&server.station_service.current_time)
+            .map_err(|_| Error::InvalidValue)?;
+        if ts.timestamp != 0 {
+            rtc.set_unix_timestamp(ts.timestamp);
+            server
+                .station_service
+                .sync_state
+                .set(server, &SyncState::Done)?;
+            info!("[gatt] RTC set to unix {}", ts.timestamp);
+        }
+        return Ok(());
+    }
+
+    if write.handle() == server.station_service.sync_state.handle {
+        let state: SyncState = write
+            .value(&server.station_service.sync_state)
+            .map_err(|_| Error::InvalidValue)?;
+        info!("[gatt] sync_state write: {}", state.0);
+    }
+
+    Ok(())
 }

@@ -135,7 +135,7 @@ export class MyceliumBuild {
   }
 
   @func()
-  createClient(generator: string, props: string): Directory {
+  createClient(generator: string, name: string): Directory {
   
     const openapi = this.containerBackend().withExec(["sbt", 'runMain co.mycelium.OpenApiGenerator']).file("openapi.json");
     const generated = dag.container().from("openapitools/openapi-generator-cli:v7.14.0")
@@ -145,21 +145,11 @@ export class MyceliumBuild {
         "/usr/local/bin/docker-entrypoint.sh", "generate",
           "-i", "/tmp/openapi.json",     // input file
           "-g", generator,
-          `--additional-properties=${props}`,
+          `--additional-properties=packageName=${name},supportMiddleware=true`,
           "-o", "/out"             // output directory inside container
       ]);
 
     return generated.directory("/out");
-  }
-
-  @func()
-  createRustClient(name: string): Directory {
-    return this.createClient("rust", `packageName=${name},supportMiddleware=true`)
-  }
-
-  @func()
-  createTypescriptClient(): Directory {
-    return this.createClient("typescript-axios", `axiosVersion=1.13.2`)
   }
 
   /**

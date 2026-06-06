@@ -1,41 +1,27 @@
+use std::sync::Arc;
+
 use chrono::TimeDelta;
 use crate::cfg::PeripheralSyncMode;
 use crate::measurements::random::RandomPeripheralSyncResultStreamProvider;
 use crate::measurements::types::PeripheralSyncResultStreamProvider;
+use crate::ports::plant_profiles::PlantProfilePort;
 
 pub mod random;
 pub mod types;
-
-#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-pub mod trouble;
-#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 pub mod btleplug;
 
 pub async fn make_peripheral_sync_stream_provider(
     mode: &PeripheralSyncMode,
+    plant_profiles: Arc<dyn PlantProfilePort>,
 ) -> anyhow::Result<Box<dyn PeripheralSyncResultStreamProvider>> {
     match mode {
         PeripheralSyncMode::Ble => {
             {
-                #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-                {
-                    let provider = btleplug::BtleplugPeripheralSyncResultStreamProvider::new().await?;
+                let provider =
+                    btleplug::BtleplugPeripheralSyncResultStreamProvider::new(plant_profiles)
+                        .await?;
 
-                    anyhow::Ok(Box::new(provider))
-                }
-
-                #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-                {
-                    use bt_hci::controller::ExternalController;
-                    use tokio::task::LocalSet;
-                    use crate::{ble::hci::Transport, measurements::trouble::TroublePeripheralSyncResultStreamProvider};
-
-                    let transport = Transport::new(0)?;
-                    let controller = ExternalController::<_, 8>::new(transport);
-                    let ls = LocalSet::new();
-                    let provider = TroublePeripheralSyncResultStreamProvider::new(controller, ls).await;
-                    anyhow::Ok(Box::new(provider))
-                }
+                anyhow::Ok(Box::new(provider))
             }
 
         }

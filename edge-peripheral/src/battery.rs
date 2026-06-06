@@ -1,12 +1,12 @@
 use esp_hal::{analog::adc::{Adc, AdcChannel, AdcPin}, peripherals::ADC1, Blocking};
 
 pub struct BatteryMeasurement<'a, PIN> where PIN : AdcChannel {
-    adc: Adc<'a, ADC1, Blocking>,
-    adc_pin: AdcPin<PIN, ADC1>
+    adc: Adc<'a, ADC1<'a>, Blocking>,
+    adc_pin: AdcPin<PIN, ADC1<'a>>
 }
 
 impl <'a, PIN : AdcChannel> BatteryMeasurement<'a, PIN> {
-    pub fn new(adc: Adc<'a, ADC1, Blocking>, pin: AdcPin<PIN, ADC1>) -> Self {
+    pub fn new(adc: Adc<'a, ADC1<'a>, Blocking>, pin: AdcPin<PIN, ADC1<'a>>) -> Self {
         BatteryMeasurement { adc: adc, adc_pin: pin }
     }
 

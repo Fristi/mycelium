@@ -3,41 +3,55 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use btleplug::api::bleuuid::uuid_from_u16;
-use btleplug::api::{
-    Central, Characteristic, Manager as _, Peripheral as _, ScanFilter, WriteType,
-};
+use btleplug::api::{Central, Manager as _, Peripheral as _, ScanFilter, WriteType};
 use btleplug::platform::{Adapter, Manager, Peripheral};
-use chrono::{DateTime, Utc};
-use edge_protocol::*;
+use chrono::{DateTime, Duration, Utc};
+use edge_protocol::v2::{
+    decode_mac_address, decode_proto, encode_proto, events_to_measurement_entries,
+    STATION_CURRENT_TIME_CHARACTERISTIC_UUID_16, STATION_EVENTS_CHARACTERISTIC_UUID_16,
+    STATION_MAC_ADDR_CHARACTERISTIC_UUID_16, STATION_PLANT_PROFILE_CHARACTERISTIC_UUID_16,
+    STATION_SERVICE_UUID_16,
+};
+use edge_protocol::v2_proto::{Events, Timestamp};
 use futures::Stream;
-use tokio::time::{sleep, Duration};
+use tokio::time::{sleep, timeout, Duration as TokioDuration};
 use tracing::info;
 use uuid::Uuid;
 
 use crate::measurements::types::{PeripheralSyncResult, PeripheralSyncResultStreamProvider};
+use crate::ports::plant_profiles::{api_profile_to_proto, PlantProfilePort};
 
-const CURRENT_TIME_SERVICE: Uuid = uuid_from_u16(CURRENT_TIME_SERVICE_UUID);
-const CURRENT_TIME_CHAR: Uuid = uuid_from_u16(CURRENT_TIME_CHARACTERISTIC_UUID);
-const MEASUREMENT_SERVICE: Uuid = uuid_from_u16(MEASUREMENT_SERVICE_UUID_16);
-const MEASUREMENT_CHAR: Uuid = uuid_from_u16(MEASUREMENT_CHARACTERISTIC_UUID_16);
-const ADDRESS_SERVICE: Uuid = uuid_from_u16(ADDRESS_SERVICE_UUID_16);
-const ADDRESS_CHAR: Uuid = uuid_from_u16(ADDRESS_CHARACTERISTIC_UUID_16);
+const CONNECT_TIMEOUT: TokioDuration = TokioDuration::from_secs(10);
+const READ_RETRY_DELAY: TokioDuration = TokioDuration::from_millis(200);
+const READ_RETRIES: usize = 5;
+
+// trouble-host registers GATT services/chars with 16-bit UUIDs; btleplug expects the
+// Bluetooth base UUID form (0000XXXX-0000-1000-8000-00805f9b34fb), not the custom 128-bit IDs.
+const STATION_SERVICE: Uuid = uuid_from_u16(STATION_SERVICE_UUID_16);
+const STATION_MAC_ADDR_CHARACTERISTIC: Uuid = uuid_from_u16(STATION_MAC_ADDR_CHARACTERISTIC_UUID_16);
+const STATION_EVENTS_CHARACTERISTIC: Uuid = uuid_from_u16(STATION_EVENTS_CHARACTERISTIC_UUID_16);
+const STATION_CURRENT_TIME_CHARACTERISTIC: Uuid =
+    uuid_from_u16(STATION_CURRENT_TIME_CHARACTERISTIC_UUID_16);
+const STATION_PLANT_PROFILE_CHARACTERISTIC: Uuid =
+    uuid_from_u16(STATION_PLANT_PROFILE_CHARACTERISTIC_UUID_16);
 
 pub struct BtleplugPeripheralSyncResultStreamProvider {
     adapter: Arc<Adapter>,
+    plant_profiles: Arc<dyn PlantProfilePort>,
 }
 
 impl BtleplugPeripheralSyncResultStreamProvider {
-    pub async fn new() -> anyhow::Result<Self> {
+    pub async fn new(plant_profiles: Arc<dyn PlantProfilePort>) -> anyhow::Result<Self> {
         let manager = Manager::new().await?;
         let adapters = manager.adapters().await?;
         let adapter = adapters
             .into_iter()
-            .nth(0)
+            .next()
             .ok_or(anyhow!("No adapter found"))?;
 
         Ok(BtleplugPeripheralSyncResultStreamProvider {
             adapter: Arc::new(adapter),
+            plant_profiles,
         })
     }
 }
@@ -45,135 +59,217 @@ impl BtleplugPeripheralSyncResultStreamProvider {
 impl PeripheralSyncResultStreamProvider for BtleplugPeripheralSyncResultStreamProvider {
     fn stream(self: Box<Self>) -> Pin<Box<dyn Stream<Item = Vec<PeripheralSyncResult>>>> {
         let adapter = self.adapter.clone();
-        let stream = futures::stream::unfold(adapter, |adapter| async {
+        let plant_profiles = self.plant_profiles.clone();
+        let stream = futures::stream::unfold((adapter, plant_profiles), |(adapter, plant_profiles)| async move {
             if let Err(err) = adapter
                 .start_scan(ScanFilter {
-                    services: vec![CURRENT_TIME_SERVICE],
+                    services: vec![STATION_SERVICE],
                 })
-                .await {
+                .await
+            {
                 tracing::error!(?err, "Btleplug error occurred");
-                return None
-            };
+                return None;
+            }
 
-            
+            sleep(TokioDuration::from_secs(1)).await;
 
             let peripherals = adapter.peripherals().await.ok()?;
             let mut results = vec![];
 
-            tracing::info!("Found {} peripherals", peripherals.len());
+            if let Err(err) = adapter.stop_scan().await {
+                info!("Error occurred while stop scanning: {:?}", err);
+            }
+
+            tracing::info!("Found {:?} peripherals", peripherals);
 
             for peripheral in peripherals {
                 let now = Utc::now();
-                match sync(peripheral, now).await {
+                match sync(peripheral, now, plant_profiles.as_ref()).await {
                     Err(err) => tracing::warn!(?err, "Sync error occurred"),
-                    Ok(result) => results.push(result)
+                    Ok(result) => results.push(result),
                 }
             }
 
-            sleep(Duration::from_secs(1)).await;
-
-            if let Err(err) = adapter.stop_scan().await {
-                tracing::error!(?err, "Btleplug error occurred");
-                return None
-            };
-
-            Some((results, adapter))
+            Some((results, (adapter, plant_profiles)))
         });
 
         Box::pin(stream)
     }
 }
 
-async fn sync(peripheral: Peripheral, now: DateTime<Utc>) -> anyhow::Result<PeripheralSyncResult> {
-    async fn find_characteristic_or_disconnect(
-        peripheral: &Peripheral,
-        service: Uuid,
-        characteristic: Uuid,
-    ) -> anyhow::Result<Characteristic> {
-        let services = peripheral.services();
-        let service = match services.iter().find(|s| s.uuid == service) {
-            Some(s) => s,
-            None => {
-                peripheral.disconnect().await?;
-                return Err(anyhow!("Device does not have {} service", service));
-            }
-        };
-
-        info!("Found device {:?}", peripheral.address());
-
-        let characteristic = match service
-            .characteristics
-            .iter()
-            .find(|c| c.uuid == characteristic)
-        {
-            Some(c) => c,
-            None => {
-                peripheral.disconnect().await?;
-                return Err(anyhow!(
-                    "Device does not have {} characteristic",
-                    characteristic
-                ));
-            }
-        };
-
-        Ok(characteristic.clone())
+async fn sync(
+    peripheral: Peripheral,
+    now: DateTime<Utc>,
+    plant_profiles: &dyn PlantProfilePort,
+) -> anyhow::Result<PeripheralSyncResult> {
+    if peripheral.properties().await?.and_then(|p| p.local_name).as_deref() != Some("Mycelium")
+    {
+        return Err(anyhow!("Skipping non-Mycelium peripheral"));
     }
 
-    if !peripheral.is_connected().await? {
-        peripheral.connect().await?;
-    }
+    timeout(CONNECT_TIMEOUT, peripheral.connect())
+        .await
+        .map_err(|_| anyhow!("Connect timed out after {CONNECT_TIMEOUT:?}"))??;
 
     peripheral.discover_services().await?;
 
-    let address_char =
-        find_characteristic_or_disconnect(&peripheral, ADDRESS_SERVICE, ADDRESS_CHAR).await?;
-    let data = peripheral.read(&address_char).await?;
-    let address: [u8; 6] = data
-        .as_slice()
-        .try_into()
-        .map_err(|_| anyhow!("Address data is not 6 bytes"))?;
+    let services = peripheral.services();
+    info!("Services: {:?}", services);
 
-    let current_time_char =
-        find_characteristic_or_disconnect(&peripheral, CURRENT_TIME_SERVICE, CURRENT_TIME_CHAR)
-            .await?;
-    let data = peripheral.read(&current_time_char).await?;
-    let bytes = data.as_slice();
-    let current_time = CurrentTime::from_bytes(bytes);
-    let datetime = current_time.to_naivedatetime();
+    let service = services
+        .iter()
+        .find(|s| s.uuid == STATION_SERVICE)
+        .ok_or_else(|| anyhow!("Device does not have {STATION_SERVICE} service"))?;
 
-    let duration = now.naive_utc() - datetime;
-    let ct = CurrentTime::from_naivedatetime(now.naive_utc());
-    let bytes = ct.to_bytes();
-    peripheral
-        .write(&current_time_char, &bytes, WriteType::WithoutResponse)
-        .await?;
+    let mac_addr_char = service
+        .characteristics
+        .iter()
+        .find(|c| c.uuid == STATION_MAC_ADDR_CHARACTERISTIC)
+        .ok_or_else(|| {
+            anyhow!("Device does not have {STATION_MAC_ADDR_CHARACTERISTIC} characteristic")
+        })?;
 
-    let measurement_char =
-        find_characteristic_or_disconnect(&peripheral, MEASUREMENT_SERVICE, MEASUREMENT_CHAR)
-            .await?;
-    let measurement_data = peripheral.read(&measurement_char).await?;
+    let events_char = service
+        .characteristics
+        .iter()
+        .find(|c| c.uuid == STATION_EVENTS_CHARACTERISTIC)
+        .ok_or_else(|| {
+            anyhow!("Device does not have {STATION_EVENTS_CHARACTERISTIC} characteristic")
+        })?;
 
-    if measurement_data.len() != 198 {
-        peripheral.disconnect().await?;
-        return Err(anyhow!("Measurement data is not 198 bytes"));
+    let time_char = service
+        .characteristics
+        .iter()
+        .find(|c| c.uuid == STATION_CURRENT_TIME_CHARACTERISTIC)
+        .ok_or_else(|| {
+            anyhow!("Device does not have {STATION_CURRENT_TIME_CHARACTERISTIC} characteristic")
+        })?;
+
+    let profile_char = service
+        .characteristics
+        .iter()
+        .find(|c| c.uuid == STATION_PLANT_PROFILE_CHARACTERISTIC)
+        .ok_or_else(|| {
+            anyhow!("Device does not have {STATION_PLANT_PROFILE_CHARACTERISTIC} characteristic")
+        })?;
+
+    let mac_addr_data = read_characteristic(&peripheral, mac_addr_char).await?;
+    let address = decode_mac_address(&mac_addr_data).map_err(|e| {
+        anyhow!(
+            "Failed to decode MacAddress from {} bytes {:02x?}: {e:?}",
+            mac_addr_data.len(),
+            mac_addr_data
+        )
+    })?;
+
+    info!(
+        "Found device {:?} (station mac {:02x?})",
+        peripheral.address(),
+        address
+    );
+
+    let time_drift = write_current_time(&peripheral, time_char, now).await?;
+
+    if let Some(api_profile) = plant_profiles.profile_for_mac(&address) {
+        sync_plant_profile(&peripheral, profile_char, &api_profile).await?;
+    } else {
+        info!(
+            "No plant profile found for station mac {:02x?}",
+            address
+        );
     }
 
-    let mut measurements = Vec::<MeasurementSerieEntry>::new();
+    let events_data = read_characteristic(&peripheral, events_char).await?;
+    let events: Events = decode_proto(&events_data)
+        .map_err(|e| anyhow!("Failed to decode Events protobuf: {e:?}"))?;
 
-    for i in 0..6 {
-        let start = i * 33;
-        let end = start + 33;
-        let segment = &measurement_data[start..end];
+    let measurements = events_to_measurement_entries::<32>(events)
+        .map_err(|_| anyhow!("Failed to convert events to measurements"))?
+        .into_iter()
+        .collect();
 
-        match MeasurementSerieEntry::from_tlv(segment) {
-            Ok(entry) => measurements.push(entry),
-            Err(err) => tracing::warn!("Error decoding measurement entry {:?}", err),
-        }
-    }
+    peripheral.disconnect().await?;
 
     Ok(PeripheralSyncResult {
-        address: address,
-        time_drift: duration,
-        measurements: measurements,
+        address,
+        time_drift,
+        measurements,
     })
+}
+
+async fn sync_plant_profile(
+    peripheral: &Peripheral,
+    profile_char: &btleplug::api::Characteristic,
+    api_profile: &edge_client_backend::models::PlantProfile,
+) -> anyhow::Result<()> {
+    use btleplug::api::Peripheral as _;
+
+    let proto_profile = api_profile_to_proto(&api_profile.variables);
+    let mut buf = [0u8; 64];
+    let len = encode_proto(&proto_profile, &mut buf)
+        .map_err(|_| anyhow!("Failed to encode PlantProfile"))?;
+
+    peripheral
+        .write(profile_char, &buf[..len], WriteType::WithResponse)
+        .await?;
+
+    info!(
+        "Wrote plant profile {:?} ({} bytes)",
+        api_profile.name, len
+    );
+
+    Ok(())
+}
+
+async fn write_current_time(
+    peripheral: &Peripheral,
+    time_char: &btleplug::api::Characteristic,
+    now: DateTime<Utc>,
+) -> anyhow::Result<Duration> {
+    use btleplug::api::Peripheral as _;
+
+    let central_secs = now.timestamp();
+    if central_secs < 0 {
+        return Ok(Duration::zero());
+    }
+
+    let timestamp = Timestamp {
+        timestamp: central_secs as u32,
+    };
+    let mut buf = [0u8; 8];
+    let len = encode_proto(&timestamp, &mut buf).map_err(|_| anyhow!("Failed to encode Timestamp"))?;
+
+    peripheral
+        .write(time_char, &buf[..len], WriteType::WithResponse)
+        .await?;
+
+    let read_back = read_characteristic(peripheral, time_char).await?;
+    let station_time: Timestamp = decode_proto(&read_back)
+        .map_err(|e| anyhow!("Failed to decode Timestamp after write: {e:?}"))?;
+
+    let drift_secs = station_time.timestamp as i64 - central_secs;
+    info!(
+        "Wrote unix time {central_secs}, station reports {} (drift {drift_secs}s)",
+        station_time.timestamp
+    );
+
+    Ok(Duration::seconds(drift_secs))
+}
+
+async fn read_characteristic(
+    peripheral: &Peripheral,
+    characteristic: &btleplug::api::Characteristic,
+) -> anyhow::Result<Vec<u8>> {
+    use btleplug::api::Peripheral as _;
+
+    for attempt in 0..READ_RETRIES {
+        let data = peripheral.read(characteristic).await?;
+        if !data.is_empty() {
+            return Ok(data);
+        }
+        if attempt + 1 < READ_RETRIES {
+            sleep(READ_RETRY_DELAY).await;
+        }
+    }
+    Ok(vec![])
 }

@@ -15,7 +15,7 @@ jobs:
           version: "latest"
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
       - name: Build clients
-        run: create-rust-client edge-client-backend | export edge-client-backend
+        run: create-client rust edge-client-backend | export edge-client-backend
         shell: dagger {0}
       - name: CI
         run: ci

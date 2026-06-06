@@ -3,7 +3,19 @@ edition = "2021"
 name    = "edge-protocol"
 version = "0.1.0"
 
+[package.metadata.cargo-machete]
+ignored = ["micropb-gen"]
+
+[features]
+default = []
+gatt = ["dep:trouble-host"]
+
 [dependencies]
-bitflags = { version = "2.9.1", features = ["bytemuck"] }
 chrono = { version = "0.4.41", default-features = false }
 timeseries = { git = "https://github.com/Fristi/timeseries", rev = "869521bb62a99a101e8f0f7d60fadac2a2a046ba" }
+micropb = { version = "0.4.1", features = ["container-heapless"] }
+heapless = "0.8"
+trouble-host = { version = "0.6.0", optional = true }
+
+[build-dependencies]
+micropb-gen = "0.4.1"

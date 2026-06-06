@@ -29,12 +29,18 @@ pub struct WifiConfig {
     pub password: String,
 }
 
+fn default_plant_profiles_sync_interval_secs() -> u64 {
+    60
+}
+
 #[derive(Debug, Deserialize)]
 pub struct AppConfig {
     pub backend_url: String,
     pub database_url: String,
     pub onboarding_strategy: OnboardingStrategy,
     pub peripheral_sync_mode: PeripheralSyncMode,
+    #[serde(default = "default_plant_profiles_sync_interval_secs")]
+    pub plant_profiles_sync_interval_secs: u64,
     pub auth0: Auth0Config,
     pub wifi: WifiConfig,
 }
@@ -76,12 +82,14 @@ mod tests {
         env::set_var("APP.AUTH0.AUDIENCE", "test-audience");
         env::set_var("APP.WIFI.SSID", "test-wifi");
         env::set_var("APP.WIFI.PASSWORD", "test-password");
+        env::set_var("APP.PLANT_PROFILES_SYNC_INTERVAL_SECS", "120");
 
         // Load configuration from environment
         let config = AppConfig::from_env().unwrap();
 
         // Verify the configuration was loaded correctly
         assert_eq!(config.database_url, "postgres://localhost/test");
+        assert_eq!(config.plant_profiles_sync_interval_secs, 120);
         match config.onboarding_strategy {
             OnboardingStrategy::Ble => {}
             _ => panic!("Expected OnboardingStrategy::Ble"),
@@ -108,6 +116,7 @@ mod tests {
         env::remove_var("APP.AUTH0.AUDIENCE");
         env::remove_var("APP.WIFI.SSID");
         env::remove_var("APP.WIFI.PASSWORD");
+        env::remove_var("APP.PLANT_PROFILES_SYNC_INTERVAL_SECS");
     }
 
     #[test]
