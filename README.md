@@ -15,8 +15,7 @@ system consists of five main components:
   collects measurements, manages time synchronization, and handles local data
   persistence with cloud synchronization
 - **edge-protocol** - Shared Rust protocol library that defines the communication
-  format between peripheral and central devices using TLV (Type-Length-Value)
-  encoding
+  format between peripheral and central devices using protobuf over BLE GATT
 - **backend** - Scala-based cloud backend service with REST API, PostgreSQL database,
   Auth0 authentication, and comprehensive plant management features
 - **app** - Cross-platform desktop application built with Tauri (Rust + React)
@@ -155,7 +154,7 @@ mycelium/
 │   ├── .cargo/           # Cargo configuration for ESP32
 │   └── rust-toolchain.toml # Rust toolchain specification
 ├── edge-protocol/         # Shared protocol library (Rust)
-│   └── src/lib.rs        # Protocol definitions and TLV encoding
+│   └── src/lib.rs        # Protocol definitions and protobuf encoding
 ├── backend/               # Cloud backend service (Scala)
 │   ├── src/main/scala/   # Scala source code
 │   ├── src/main/resources/migrations/ # PostgreSQL Flyway migrations

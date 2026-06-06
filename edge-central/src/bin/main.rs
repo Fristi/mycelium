@@ -1,9 +1,9 @@
-pub mod ble;
 pub mod cfg;
 pub mod data;
 pub mod auth;
 pub mod measurements;
 pub mod onboarding;
+pub mod ports;
 pub mod status;
 
 use aliri_reqwest::AccessTokenMiddleware;
@@ -16,13 +16,14 @@ use reqwest::{Client, Request, Url};
 use reqwest_middleware::ClientBuilder;
 use reqwest_tracing::TracingMiddleware;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool};
-use std::{str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc, time::Duration};
 use crate::measurements::types::PeripheralSyncResult;
 use crate::data::sqlite::SqliteEdgeStateRepository;
 use crate::cfg::AppConfig;
 use crate::status::StatusSummary;
 use crate::measurements::make_peripheral_sync_stream_provider;
 use crate::onboarding::make_onboarding;
+use crate::ports::plant_profiles::{CachedPlantProfilePort, run_profile_sync};
 use crate::status::make_status;
 
 #[tokio::main]
@@ -101,7 +102,20 @@ async fn work() -> anyhow::Result<()> {
         api_key: None                
     };
 
-    let provider = make_peripheral_sync_stream_provider(&app_config.peripheral_sync_mode).await?;
+    let plant_profile_store = Arc::new(CachedPlantProfilePort::new());
+    let sync_interval =
+        Duration::from_secs(app_config.plant_profiles_sync_interval_secs);
+    tokio::spawn(run_profile_sync(
+        configuration.clone(),
+        plant_profile_store.clone(),
+        sync_interval,
+    ));
+
+    let provider = make_peripheral_sync_stream_provider(
+        &app_config.peripheral_sync_mode,
+        plant_profile_store,
+    )
+    .await?;
     let stream = provider.stream().flat_map(stream::iter);
 
     stream

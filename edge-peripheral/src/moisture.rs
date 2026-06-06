@@ -1,6 +1,6 @@
 use embassy_time::Timer;
 use embedded_hal::{i2c::{I2c, SevenBitAddress}};
-use crate::anyhow_utils::*;
+use crate::utils::anyhow::ResultAny;
 
 const ADDR: u8 = 0x55;
 

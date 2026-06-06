@@ -4,6 +4,7 @@ use chrono::Duration;
 use edge_protocol::MeasurementSerieEntry;
 use futures::Stream;
 
+#[derive(Debug)]
 pub struct PeripheralSyncResult {
     pub address: [u8; 6],
     pub time_drift: Duration,

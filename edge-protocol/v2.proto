@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+message Interval {
+  int32 start = 1;
+  int32 end   = 2;
+}
+
+message PlantProfile {
+  Interval light_mmol    = 1;
+  Interval light_lux     = 2;
+  Interval temperature   = 3;
+  Interval humidity      = 4;
+  Interval soil_moisture = 5;
+  Interval soil_ec       = 6;
+}
+
+message Timestamp {
+    uint32 timestamp = 1;
+}
+
+message Measurement {
+  uint32 battery     = 1;
+  float  lux         = 2;
+  float  temperature = 3;
+  float  humidity    = 4;
+  float  soil_pf     = 5;
+}
+
+message MeasurementEntry {
+                Timestamp   start       = 1;
+    optional    Timestamp   end         = 2;
+                Measurement measurement = 3;
+}
+
+
+message WateringEntry {
+    Timestamp   occurred_at         = 1;
+    uint32      duration_msec       = 2;
+}
+
+
+message Event {
+    oneof event {
+        MeasurementEntry measurement    = 1;
+        WateringEntry    watering       = 2;
+    }
+}
+
+message Events {
+    repeated Event events = 1;
+}
+
+message MacAddress {
+    bytes mac_address   = 1;
+}
+
+
+enum SyncState {
+    Ready = 0;
+    InProgress = 1;
+    Done = 2;
+}
