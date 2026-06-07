@@ -22,4 +22,9 @@ export const AddPlantSchema = z.object({
   location: z.string({ required_error: "Location is required" }).trim().min(1, "Name cannot be empty"),
   wifi_ssid: z.string({ required_error: "SSID is required" }).trim().min(1, "Name cannot be empty"),
   wifi_password: z.string({ required_error: "Password is required" }).trim().min(1, "Name cannot be empty"),
-}); 
+});
+
+export const AddHubSchema = z.object({
+  wifi_ssid: z.string({ required_error: "SSID is required" }).trim().min(1, "SSID cannot be empty"),
+  wifi_password: z.string({ required_error: "Password is required" }).trim().min(1, "Password cannot be empty"),
+});

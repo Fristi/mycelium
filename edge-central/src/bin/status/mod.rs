@@ -6,8 +6,17 @@ use anyhow::Result;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use edge_protocol::MeasurementSerieEntry;
 
-pub trait Status {
+pub struct OnboardingDisplay {
+    pub line1: String,
+    pub line2: Option<String>,
+}
+
+pub trait Status: Send {
     fn show(&mut self, summary: &StatusSummary) -> Result<()>;
+    fn show_onboarding(&mut self, display: &OnboardingDisplay) -> Result<()> {
+        let _ = display;
+        Ok(())
+    }
 }
 
 pub fn make_status() -> Result<Box<dyn Status>> {

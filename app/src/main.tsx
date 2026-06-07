@@ -8,7 +8,7 @@ import { AuthContext } from "./AuthContext.tsx";
 import { PlantView } from "./pages/PlantView.tsx";
 import { PlantList } from "./pages/PlantList.tsx";
 import { PlantEdit } from "./pages/PlantEdit.tsx";
-import { PlantAdd, PlantProvisioning } from "./pages/PlantAdd.tsx";
+import { HubAdd, HubProvisioning } from "./pages/HubAdd.tsx";
 
 const callbackUri = "http://localhost:1420";
 const cacheLocation = "localstorage";
@@ -22,8 +22,8 @@ const router = createHashRouter(
     >
       <Route>
         <Route index element={<PlantList />} />
-        <Route path="plant-add" element={<PlantAdd />} />
-        <Route path="plant-add/:deviceId" element={<PlantProvisioning />} />
+        <Route path="hub-add" element={<HubAdd />} />
+        <Route path="hub-add/:deviceId" element={<HubProvisioning />} />
         <Route path="plants/:plantId/edit" element={<PlantEdit />} />
         <Route path="plants/:plantId" element={<PlantView />} />
       </Route>

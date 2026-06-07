@@ -1,13 +1,16 @@
 import { Disclosure } from "@headlessui/react";
 import { Bars3Icon, BellIcon, XMarkIcon } from "@heroicons/react/24/outline";
-import { Outlet } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 
 const user = {
   name: "Tom Cook",
   email: "tom@example.com",
   imageUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
 };
-const navigation = [{ name: "Your plants", href: "/", current: true }];
+const navigation = [
+  { name: "Your plants", to: "/" },
+  { name: "Add hub", to: "/hub-add" },
+];
 const userNavigation = [
   { name: "Your Profile", href: "#" },
   { name: "Settings", href: "#" },
@@ -19,6 +22,8 @@ function classNames<T>(...classes: T[]) {
 }
 
 export default function Shell() {
+  const location = useLocation();
+
   return (
     <>
       <div className="min-h-full">
@@ -33,19 +38,25 @@ export default function Shell() {
                     </div>
                     <div className="hidden md:block">
                       <div className="ml-10 flex items-baseline space-x-4">
-                        {navigation.map((item) => (
-                          <a
-                            key={item.name}
-                            href={item.href}
-                            className={classNames(
-                              item.current ? "bg-stone-700 text-white" : "text-white hover:bg-stone-500 hover:bg-opacity-75",
-                              "rounded-md px-3 py-2 text-sm font-medium",
-                            )}
-                            aria-current={item.current ? "page" : undefined}
-                          >
-                            {item.name}
-                          </a>
-                        ))}
+                        {navigation.map((item) => {
+                          const current =
+                            item.to === "/"
+                              ? location.pathname === "/"
+                              : location.pathname.startsWith(item.to);
+                          return (
+                            <Link
+                              key={item.name}
+                              to={item.to}
+                              className={classNames(
+                                current ? "bg-stone-700 text-white" : "text-white hover:bg-stone-500 hover:bg-opacity-75",
+                                "rounded-md px-3 py-2 text-sm font-medium",
+                              )}
+                              aria-current={current ? "page" : undefined}
+                            >
+                              {item.name}
+                            </Link>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -102,20 +113,26 @@ export default function Shell() {
 
               <Disclosure.Panel className="md:hidden">
                 <div className="space-y-1 px-2 pb-3 pt-2 sm:px-3">
-                  {navigation.map((item) => (
-                    <Disclosure.Button
-                      key={item.name}
-                      as="a"
-                      href={item.href}
-                      className={classNames(
-                        item.current ? "bg-stone-700 text-white" : "text-white hover:bg-stone-500 hover:bg-opacity-75",
-                        "block rounded-md px-3 py-2 text-base font-medium",
-                      )}
-                      aria-current={item.current ? "page" : undefined}
-                    >
-                      {item.name}
-                    </Disclosure.Button>
-                  ))}
+                  {navigation.map((item) => {
+                    const current =
+                      item.to === "/"
+                        ? location.pathname === "/"
+                        : location.pathname.startsWith(item.to);
+                    return (
+                      <Disclosure.Button
+                        key={item.name}
+                        as={Link}
+                        to={item.to}
+                        className={classNames(
+                          current ? "bg-stone-700 text-white" : "text-white hover:bg-stone-500 hover:bg-opacity-75",
+                          "block rounded-md px-3 py-2 text-base font-medium",
+                        )}
+                        aria-current={current ? "page" : undefined}
+                      >
+                        {item.name}
+                      </Disclosure.Button>
+                    );
+                  })}
                 </div>
                 <div className="border-t border-stone-700 pb-3 pt-4">
                   <div className="flex items-center px-5">

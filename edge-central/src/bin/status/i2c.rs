@@ -1,4 +1,4 @@
-use crate::status::{Status, StatusSummary};
+use crate::status::{OnboardingDisplay, Status, StatusSummary};
 use embedded_graphics::{
     mono_font::{
         MonoTextStyle, ascii::{FONT_5X7}
@@ -61,6 +61,30 @@ impl Status for I2cStatus {
         }
 
         self.display.flush().map_err(|e| anyhow::anyhow!("Unable to flush display: {:?}", e))?;
+
+        Ok(())
+    }
+
+    fn show_onboarding(&mut self, display: &OnboardingDisplay) -> Result<()> {
+        let style = MonoTextStyle::new(&FONT_5X7, BinaryColor::On);
+
+        self.display
+            .clear(BinaryColor::Off)
+            .map_err(|e| anyhow::anyhow!("Unable to clear display: {:?}", e))?;
+
+        Text::with_alignment(&display.line1, Point::new(64, 10), style, Alignment::Center)
+            .draw(&mut self.display)
+            .map_err(|e| anyhow::anyhow!("Unable to draw: {:?}", e))?;
+
+        if let Some(line2) = &display.line2 {
+            Text::with_alignment(line2, Point::new(64, 22), style, Alignment::Center)
+                .draw(&mut self.display)
+                .map_err(|e| anyhow::anyhow!("Unable to draw: {:?}", e))?;
+        }
+
+        self.display
+            .flush()
+            .map_err(|e| anyhow::anyhow!("Unable to flush display: {:?}", e))?;
 
         Ok(())
     }

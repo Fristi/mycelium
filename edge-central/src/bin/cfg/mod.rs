@@ -29,6 +29,16 @@ pub struct WifiConfig {
     pub password: String,
 }
 
+#[derive(Debug, Deserialize, Clone, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum WifiProvisionerMode {
+    /// Accept BLE WiFi credentials but do not change system networking.
+    #[default]
+    Noop,
+    /// Join WiFi via nmcli or wpa_cli on the hub.
+    System,
+}
+
 fn default_plant_profiles_sync_interval_secs() -> u64 {
     60
 }
@@ -42,7 +52,14 @@ pub struct AppConfig {
     #[serde(default = "default_plant_profiles_sync_interval_secs")]
     pub plant_profiles_sync_interval_secs: u64,
     pub auth0: Auth0Config,
-    pub wifi: WifiConfig,
+    #[serde(default)]
+    pub wifi: Option<WifiConfig>,
+    /// How BLE onboarding applies WiFi credentials (default: noop).
+    #[serde(default)]
+    pub wifi_provisioner: WifiProvisionerMode,
+    /// Wireless interface for `system` WiFi provisioning (default: wlan0).
+    #[serde(default)]
+    pub wifi_interface: Option<String>,
 }
 
 impl AppConfig {
@@ -102,8 +119,9 @@ mod tests {
         assert_eq!(config.auth0.client_id, "test-client-id");
         assert_eq!(config.auth0.scope, "openid profile");
         assert_eq!(config.auth0.audience, "test-audience");
-        assert_eq!(config.wifi.ssid, "test-wifi");
-        assert_eq!(config.wifi.password, "test-password");
+        let wifi = config.wifi.as_ref().expect("wifi config");
+        assert_eq!(wifi.ssid, "test-wifi");
+        assert_eq!(wifi.password, "test-password");
 
         // Clean up environment variables
         env::remove_var("APP.BACKEND_URL");
@@ -151,10 +169,42 @@ mod tests {
         assert_eq!(config.auth0.client_id, "other-client-id");
         assert_eq!(config.auth0.scope, "email");
         assert_eq!(config.auth0.audience, "other-audience");
-        assert_eq!(config.wifi.ssid, "other-wifi");
-        assert_eq!(config.wifi.password, "other-password");
+        let wifi = config.wifi.as_ref().expect("wifi config");
+        assert_eq!(wifi.ssid, "other-wifi");
+        assert_eq!(wifi.password, "other-password");
 
         // Clean up environment variables
+        env::remove_var("APP.BACKEND_URL");
+        env::remove_var("APP.DATABASE_URL");
+        env::remove_var("APP.ONBOARDING_STRATEGY");
+        env::remove_var("APP.PERIPHERAL_SYNC_MODE");
+        env::remove_var("APP.AUTH0.DOMAIN");
+        env::remove_var("APP.AUTH0.CLIENT_ID");
+        env::remove_var("APP.AUTH0.SCOPE");
+        env::remove_var("APP.AUTH0.AUDIENCE");
+    }
+
+    #[test]
+    #[serial]
+    fn test_from_env_ble_without_wifi() {
+        env::set_var("APP.BACKEND_URL", "http://localhost:8080/api");
+        env::set_var("APP.DATABASE_URL", "postgres://localhost/test");
+        env::set_var("APP.ONBOARDING_STRATEGY", "ble");
+        env::set_var("APP.PERIPHERAL_SYNC_MODE", "random");
+        env::set_var("APP.AUTH0.DOMAIN", "test.auth0.com");
+        env::set_var("APP.AUTH0.CLIENT_ID", "test-client-id");
+        env::set_var("APP.AUTH0.SCOPE", "openid profile");
+        env::set_var("APP.AUTH0.AUDIENCE", "test-audience");
+        env::remove_var("APP.WIFI.SSID");
+        env::remove_var("APP.WIFI.PASSWORD");
+
+        let config = AppConfig::from_env().unwrap();
+        assert!(config.wifi.is_none());
+        match config.onboarding_strategy {
+            OnboardingStrategy::Ble => {}
+            _ => panic!("Expected OnboardingStrategy::Ble"),
+        }
+
         env::remove_var("APP.BACKEND_URL");
         env::remove_var("APP.DATABASE_URL");
         env::remove_var("APP.ONBOARDING_STRATEGY");

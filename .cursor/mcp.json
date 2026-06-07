@@ -2,6 +2,9 @@
   "mcpServers": {
     "rust-analyzer": {
       "command": "rust-analyzer-mcp"
+    },
+    "mycelium-metals": {
+      "url": "http://localhost:64234/mcp"
     }
   }
 }
