@@ -223,7 +223,7 @@ export class MyceliumBuild {
       .withMountedCache("/root", dag.cacheVolume("edge-central-root"))
       .withMountedCache("/usr/local/cargo/registry", dag.cacheVolume("edge-central-cargo-registry"))
       .withMountedCache("/usr/local/cargo/git", dag.cacheVolume("edge-central-cargo-git"))
-      .withDirectory("/workspace/edge-central", src.directory("edge-central").filter({include: ["src/**", "migrations/**", "Cargo.toml", "Cargo.lock"]}))
+      .withDirectory("/workspace/edge-central", src.directory("edge-central").filter({include: [".cargo/config.toml", "src/**", "migrations/**", "Cargo.toml", "Cargo.lock"]}))
       .withDirectory("/workspace/edge-client-backend", src.directory("edge-client-backend").filter({include: ["src/**", "Cargo.toml", "Cargo.lock"]}))
       .withDirectory("/workspace/edge-onboarding-ble", src.directory("edge-onboarding-ble").filter({include: ["src/**", "build.rs", "onboarding.proto", "Cargo.toml", "Cargo.lock"]}))
       .withDirectory("/workspace/edge-protocol", src.directory("edge-protocol").filter({include: ["src/**", "Cargo.toml", "Cargo.lock"]}))
