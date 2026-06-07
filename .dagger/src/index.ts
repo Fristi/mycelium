@@ -219,23 +219,22 @@ export class MyceliumBuild {
     .container({ platform: arch as any })
       .from("rust:1.88-bookworm")
       .withExec(["sh", "-c", "echo 'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/20240701T000000Z bookworm main' > /etc/apt/sources.list"])
-      .withExec(["sh", "-c", "apt-get update && apt-get install -y libdbus-1-3=1.14.10-1~deb12u1 libdbus-1-dev=1.14.10-1~deb12u1 dbus=1.14.10-1~deb12u1 pkg-config=1.8.1-1"])
+      .withExec(["sh", "-c", "apt-get update && apt-get install -y libdbus-1-3=1.14.10-1~deb12u1 libdbus-1-dev=1.14.10-1~deb12u1 dbus=1.14.10-1~deb12u1 pkg-config=1.8.1-1 protobuf-compiler"])
       .withMountedCache("/root", dag.cacheVolume("edge-central-root"))
       .withMountedCache("/usr/local/cargo/registry", dag.cacheVolume("edge-central-cargo-registry"))
       .withMountedCache("/usr/local/cargo/git", dag.cacheVolume("edge-central-cargo-git"))
-      .withMountedCache("/workspace/edge-protocol/target", dag.cacheVolume("edge-protocol-target"))
       .withDirectory("/workspace/edge-central", src.directory("edge-central").filter({include: ["src/**", "migrations/**", "Cargo.toml", "Cargo.lock"]}))
       .withDirectory("/workspace/edge-client-backend", src.directory("edge-client-backend").filter({include: ["src/**", "Cargo.toml", "Cargo.lock"]}))
+      .withDirectory("/workspace/edge-onboarding-ble", src.directory("edge-onboarding-ble").filter({include: ["src/**", "build.rs", "onboarding.proto", "Cargo.toml", "Cargo.lock"]}))
       .withDirectory("/workspace/edge-protocol", src.directory("edge-protocol").filter({include: ["src/**", "Cargo.toml", "Cargo.lock"]}))
+      .withMountedCache("/workspace/edge-protocol/target", dag.cacheVolume("edge-protocol-target"))
       .withWorkdir("/workspace/edge-central");
   }
 
   /**
-   * Container for building the peripheral component with xtensa toolchain
+   * Base container with ESP32 xtensa toolchain (independent of source changes)
    */
-  containerPeripheral(arch: string): Container {
-    const src = this.source;
-
+  containerPeripheralBase(arch: string): Container {
     return dag
       .container({ platform: arch as any })
       .from("rust:1.88-bookworm@sha256:af306cfa71d987911a781c37b59d7d67d934f49684058f96cf72079c3626bfe0")
@@ -247,12 +246,22 @@ export class MyceliumBuild {
       .withMountedCache("/usr/local/cargo/registry", dag.cacheVolume("edge-peripheral-cargo-registry"))
       .withMountedCache("/usr/local/cargo/git", dag.cacheVolume("edge-peripheral-cargo-git"))
       .withMountedCache("/usr/local/rustup/toolchains/esp", dag.cacheVolume("edge-peripheral-rustup-toolchain-esp"))
-      .withMountedCache("/workspace/edge-peripheral/target", dag.cacheVolume("edge-peripheral-target-folder"))
-      .withExec(["sh", "-c", "cargo install espup --locked --version 0.15.1"])
-      .withExec(["sh", "-c", "espup install -t esp32"])
+      .withExec(["sh", "-c", "command -v espup >/dev/null || cargo install espup --locked --version 0.15.1"])
+      .withExec(["sh", "-c", "test -f /root/export-esp.sh || espup install -t esp32"]);
+  }
+
+  /**
+   * Container for building the peripheral component with xtensa toolchain
+   */
+  containerPeripheral(arch: string): Container {
+    const src = this.source;
+
+    return this.containerPeripheralBase(arch)
       .withDirectory("/workspace/edge-peripheral", src.directory("edge-peripheral").filter({include: [".cargo/config.toml", "src/**", "build.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "template.yaml"]}))
       .withDirectory("/workspace/edge-protocol", src.directory("edge-protocol").filter({include: ["src/**", "Cargo.toml", "Cargo.lock"]}))
-      .withWorkdir("/workspace/edge-peripheral")
+      .withMountedCache("/workspace/edge-peripheral/target", dag.cacheVolume("edge-peripheral-target-folder"))
+      .withMountedCache("/workspace/edge-protocol/target", dag.cacheVolume("edge-peripheral-edge-protocol-target"))
+      .withWorkdir("/workspace/edge-peripheral");
   }
 
   /**
