@@ -10,6 +10,8 @@ brew tap messense/macos-cross-toolchains
 brew reinstall aarch64-unknown-linux-musl
 ```
 
+`bluer` and `btleplug` depend on D-Bus. For `aarch64-unknown-linux-musl` cross-builds, `edge-central` enables the `dbus` crate's `vendored` feature so libdbus is compiled and linked statically — you do not need Homebrew `dbus` or `PKG_CONFIG_*` overrides for cross-compilation.
+
 To run an the build:
 
 ```
@@ -64,3 +66,7 @@ i2c3-pg-pins {
 ```
 
 These correspond with physical wire setup, so it's connected to `i2c-3` which is located at `/dev/i2c-3`
+
+### BLE onboarding WiFi
+
+By default (`APP.WIFI_PROVISIONER=noop`) the hub accepts WiFi credentials over BLE but does not change system networking — configure WiFi on the Orange Pi separately (e.g. DietPi). Set `APP.WIFI_PROVISIONER=system` to join via `wpa_cli` or `nmcli` on the hub.

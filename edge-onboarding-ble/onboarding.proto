@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+message WifiConfig {
+  string ssid     = 1;
+  string password = 2;
+}
+
+message OnboardingStatus {
+  enum Phase {
+    AWAITING_WIFI       = 0;
+    PROVISIONING_WIFI   = 1;
+    AWAITING_AUTH       = 2;
+    COMPLETE            = 3;
+    FAILED              = 4;
+  }
+  Phase  phase                        = 1;
+  string user_code                    = 2;
+  string verification_uri_complete    = 3;
+  string error                        = 4;
+}

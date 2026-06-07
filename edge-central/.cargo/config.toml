@@ -1,2 +1,7 @@
 [target.aarch64-unknown-linux-musl]
 linker = "aarch64-linux-musl-gcc"
+# vendored libdbus: GCC 15 outline atomics need libgcc helpers missing from -static -nodefaultlibs
+rustflags = ["-C", "link-arg=-latomic", "-C", "link-arg=-lgcc"]
+
+[env]
+CFLAGS_aarch64_unknown_linux_musl = "-mno-outline-atomics"
