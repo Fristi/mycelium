@@ -285,7 +285,7 @@ export class MyceliumBuild {
    * Test the central component
    */
   @func()
-  async testCentral(@argument() arch: string = "linux/arm64"): Promise<string> {
+  async testCentral(@argument() arch: string = "linux/amd64"): Promise<string> {
     return this.containerCentral(arch)
       .withExec(["cargo", "test"]).stdout();
   }
@@ -303,7 +303,7 @@ export class MyceliumBuild {
 
     await Promise.all([
       this.buildPeripheral(arch),
-      this.testCentral(),
+      this.testCentral(arch),
       this.buildBackend()
     ]);
 
