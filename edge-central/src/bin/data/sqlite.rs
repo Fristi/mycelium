@@ -156,8 +156,8 @@ impl SqliteMeasurementRepository {
             let row = MeasurementSerieEntryRow::from_measurement_serie_entry(&mac, entry, 0);
             let res = sqlx::query(
                 "
-                INSERT INTO measurements (mac, timestamp, battery, lux, temperature, humidity)
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                INSERT INTO measurements (mac, timestamp, battery, lux, temperature, humidity, soil_pf)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
                 ",
             )
             .bind(row.mac)
@@ -166,6 +166,7 @@ impl SqliteMeasurementRepository {
             .bind(row.lux)
             .bind(row.temperature)
             .bind(row.humidity)
+            .bind(row.soil_pf)
             .execute(&mut *tx)
             .await?;
 
@@ -181,7 +182,7 @@ impl SqliteMeasurementRepository {
         let mac_ref = mac.as_ref();
         let rows: Vec<MeasurementSerieEntryRow> = sqlx::query_as(
             "
-            SELECT id, mac, timestamp, battery, lux, temperature, humidity
+            SELECT id, mac, timestamp, battery, lux, temperature, humidity, soil_pf
             FROM measurements
             WHERE mac = ?
             ",
@@ -232,6 +233,7 @@ mod tests {
                 lux: 123.4,
                 temperature: 22.5,
                 humidity: 55.0,
+                soil_pf: 100.0,
             },
         };
 
@@ -259,6 +261,7 @@ mod tests {
             entry.measurement.temperature
         );
         assert_eq!(found_entry.measurement.humidity, entry.measurement.humidity);
+        assert_eq!(found_entry.measurement.soil_pf, entry.measurement.soil_pf);
     }
 
     #[tokio::test]

@@ -1,0 +1,1 @@
+ALTER TABLE measurements ADD COLUMN soil_pf REAL NOT NULL DEFAULT 0;

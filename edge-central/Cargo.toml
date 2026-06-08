@@ -31,13 +31,17 @@ uuid = "1.18.1"
 btleplug = "0.11.8"
 
 [target.'cfg(all(target_os = "linux", target_arch = "aarch64"))'.dependencies]
-# Statically link libdbus when cross-compiling (musl); required by bluer + btleplug on Linux.
-dbus = { version = "0.9.9", features = ["vendored"] }
+# bluer + btleplug depend on D-Bus on Linux aarch64 (Orange Pi).
+dbus = "0.9.9"
 bluer = { version = "0.17", features = ["full"] }
 ssd1306 = "0.10.0"
 linux-embedded-hal = "0.4.1"
 libc = "0.2"
 embedded-graphics = "0.8.1"
+
+[target.'cfg(all(target_os = "linux", target_arch = "aarch64", target_env = "musl"))'.dependencies]
+# Statically link libdbus for musl cross-builds (no system libdbus in the toolchain sysroot).
+dbus = { version = "0.9.9", features = ["vendored"] }
 
 [dev-dependencies]
 serial_test = "3.2.0"

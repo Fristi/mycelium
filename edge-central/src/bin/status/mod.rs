@@ -20,18 +20,13 @@ pub trait Status: Send {
 }
 
 pub fn make_status() -> Result<Box<dyn Status>> {
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
     {
-        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-        {
-            anyhow::Ok(Box::new(noop::NoopStatus::new()))
-        }
-
-        #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-        {
-            let status = i2c::I2cStatus::new("/dev/i2c-3")?;
-            Ok(Box::new(status))
-        }
+        let status = i2c::I2cStatus::new("/dev/i2c-3")?;
+        return Ok(Box::new(status));
     }
+
+    Ok(Box::new(noop::NoopStatus::new()))
 }
 
 pub struct StatusSummary {
