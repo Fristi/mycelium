@@ -1,6 +1,12 @@
 #![cfg_attr(not(test), no_std)]
 
-pub mod translate;
+#[allow(
+    non_camel_case_types,
+    non_snake_case,
+    non_upper_case_globals,
+    unused_imports,
+    unused_parens
+)]
 pub mod v2_proto;
 pub mod v2;
 pub mod wire;

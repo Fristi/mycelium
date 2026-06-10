@@ -3,8 +3,8 @@ use embassy_futures::select::select;
 use trouble_host::prelude::*;
 use trouble_host::types::gatt_traits::FromGatt;
 use trouble_host::BleHostError;
+#[expect(unused_imports, reason = "loads AsGatt/FromGatt impls for proto GATT types")]
 use edge_protocol::gatt as _;
-use edge_protocol::translate::mac_address_from_bytes;
 use edge_protocol::v2::*;
 use edge_protocol::v2_proto::{Events, MacAddress, PlantProfile, SyncState, Timestamp};
 use esp_hal::rtc_cntl::Rtc;
@@ -17,8 +17,6 @@ use crate::utils::rtc::RtcExt;
 const CONNECTIONS_MAX: usize = 1;
 /// Max number of L2CAP channels.
 const L2CAP_CHANNELS_MAX: usize = 2; // Signal + att
-const L2CAP_MTU: usize = 512;
-
 #[gatt_service(uuid = STATION_SERVICE_UUID_16)]
 struct StationService {
     #[characteristic(uuid = STATION_MAC_ADDR_CHARACTERISTIC_UUID_16, read)]
@@ -54,8 +52,10 @@ struct Server {
 pub struct GattSyncSession {
     pub mac: [u8; 6],
     pub events: Events,
+    /// Written by central over GATT; retained for a future plant-profile consumer.
+    #[allow(dead_code)]
     pub current_profile: PlantProfile,
-    pub current_time: Timestamp
+    pub current_time: Timestamp,
 }
 
 impl GattSyncSession {
@@ -265,4 +265,10 @@ fn handle_gatt_write<P: PacketPool>(
     }
 
     Ok(())
+}
+
+/// Build a wire `MacAddress` from six raw bytes (including zeros).
+fn mac_address_from_bytes(value: [u8; 6]) -> Result<MacAddress, ()> {
+    let mac_address = heapless::Vec::from_slice(&value).map_err(|_| ())?;
+    Ok(MacAddress { mac_address })
 }

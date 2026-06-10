@@ -1,6 +1,5 @@
 //! BLE wire codec: protobuf encode/decode and GATT UUID constants.
 
-use crate::v2_proto::Timestamp;
 use core::convert::Infallible;
 use micropb::{DecodeError, MessageDecode, MessageEncode, PbDecoder, PbEncoder};
 
@@ -57,14 +56,3 @@ pub fn decode_proto<T: MessageDecode + Default>(
     Ok(message)
 }
 
-impl From<u32> for Timestamp {
-    fn from(value: u32) -> Self {
-        Timestamp { timestamp: value }
-    }
-}
-
-impl From<Timestamp> for u32 {
-    fn from(value: Timestamp) -> Self {
-        value.timestamp
-    }
-}

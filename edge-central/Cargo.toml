@@ -30,6 +30,7 @@ predicates-core = "1.0.9"
 reqwest-tracing = "0.5.8"
 uuid = "1.18.1"
 btleplug = "0.11.8"
+heapless = "0.9.3"
 
 [target.'cfg(all(target_os = "linux", target_arch = "aarch64"))'.dependencies]
 # bluer + btleplug depend on D-Bus on Linux aarch64 (Orange Pi).

@@ -1,4 +1,4 @@
-use crate::status::{OnboardingDisplay, Status, StatusSummary};
+use crate::status::{OnboardingDisplay, Status};
 use tracing::info;
 
 pub struct NoopStatus;
@@ -10,10 +10,6 @@ impl NoopStatus {
 }
 
 impl Status for NoopStatus {
-    fn show(&mut self, _summary: &StatusSummary) -> anyhow::Result<()> {
-        Ok(())
-    }
-
     fn show_onboarding(&mut self, onboarding: &OnboardingDisplay) -> anyhow::Result<()> {
         info!(
             line1 = %onboarding.line1,

@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime, Utc};
 
 pub trait RtcExt {
     fn now_naivedatetime(&self) -> NaiveDateTime;
@@ -11,7 +11,9 @@ impl<'a> RtcExt for esp_hal::rtc_cntl::Rtc<'a> {
         let secs = now_us / 1_000_000;
         let nsecs = (now_us % 1_000_000) * 1_000;
 
-        NaiveDateTime::from_timestamp(secs, nsecs as u32)
+        DateTime::<Utc>::from_timestamp(secs, nsecs as u32)
+            .map(|dt| dt.naive_utc())
+            .unwrap_or_default()
     }
 
     fn set_unix_timestamp(&self, secs: u32) {

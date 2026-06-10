@@ -20,11 +20,9 @@ use std::{str::FromStr, sync::Arc, time::Duration};
 use crate::measurements::types::PeripheralSyncResult;
 use crate::data::sqlite::SqliteEdgeStateRepository;
 use crate::cfg::AppConfig;
-use crate::status::StatusSummary;
 use crate::measurements::make_peripheral_sync_stream_provider;
 use crate::onboarding::make_onboarding;
 use crate::ports::plant_profiles::{CachedPlantProfilePort, run_profile_sync};
-use crate::status::make_status;
 
 #[tokio::main]
 async fn main() {
@@ -135,36 +133,9 @@ async fn sync_measurements(configuration: &Configuration, m: PeripheralSyncResul
         m.address[0], m.address[1], m.address[2], m.address[3], m.address[4], m.address[5]
     );
 
-    let payload = crate::measurements::backend_adapter::SyncPayload::from_events(m.events)?;
-
-    tracing::info!(
-        "Synced station {}: {} measurement(s), {} watering event(s)",
-        mac,
-        payload.measurements.len(),
-        payload.waterings.len()
-    );
-    for watering in &payload.waterings {
-        tracing::info!(
-            "  watering at {} for {} ms",
-            watering.timestamp.format("%Y-%m-%dT%H:%M:%SZ"),
-            watering.value.duration_msec
-        );
-    }
-
     let station_insert = StationInsert::new(mac, "Unnamed".to_string());
 
     let id = edge_client_backend::apis::default_api::add_station(&configuration, station_insert).await?;
-    let summary = StatusSummary::from_measurements(&payload.measurements);
-    let measurements = payload.to_station_measurements();
-
-    edge_client_backend::apis::default_api::checkin_station(&configuration, id.to_string().as_str(), Some(measurements)).await?;
-    match summary {
-        Some(m) => {
-            let mut status = make_status()?;
-            status.show(&m)?
-        },
-        None => ()
-    }
 
     Ok(())            
 }

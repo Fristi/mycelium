@@ -1,5 +1,4 @@
 use chrono::NaiveDateTime;
-use edge_protocol::translate::encode_device_buffer;
 use edge_protocol::v2_proto::Events;
 use edge_protocol::{Measurement, WateringSerieEntry};
 use esp_hal::ram;
@@ -30,7 +29,7 @@ impl DeviceStateData {
     }
 
     pub fn to_events(&self) -> Result<Events, ()> {
-        encode_device_buffer(&self.measurements, &self.waterings)
+        todo!()
     }
 }
 
@@ -48,7 +47,7 @@ pub enum DeviceState {
 static mut STATE: DeviceState = DeviceState::AwaitingTimeSync;
 
 pub fn get_device_state() -> &'static DeviceState {
-    return unsafe { &STATE };
+    unsafe { &*core::ptr::addr_of!(STATE) }
 }
 
 pub fn set_device_state(state: DeviceState) {

@@ -1,8 +1,7 @@
 use std::{pin::Pin, time::Duration};
 
 use chrono::{NaiveDateTime, TimeDelta, Utc};
-use edge_protocol::translate::encode_measurements_only;
-use edge_protocol::{Measurement, MeasurementSerieEntry};
+use edge_protocol::{Measurement, MeasurementSerieEntry, v2_proto::{Events}};
 use futures::{stream, Stream};
 use timeseries::Series;
 use tokio::time::sleep;
@@ -38,12 +37,10 @@ impl PeripheralSyncResultStreamProvider for RandomPeripheralSyncResultStreamProv
                     .append_monotonic(serie_entry.timestamp, serie_entry.value);
             }
 
-            let events = encode_measurements_only(&series).expect("random series fits in events");
-
             let result = PeripheralSyncResult {
                 address: mac,
                 time_drift: TimeDelta::zero(),
-                events,
+                events: Events::default(),
             };
 
             sleep(delay).await;

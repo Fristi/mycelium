@@ -6,7 +6,6 @@ use btleplug::api::bleuuid::uuid_from_u16;
 use btleplug::api::{Central, Manager as _, Peripheral as _, ScanFilter, WriteType};
 use btleplug::platform::{Adapter, Manager, Peripheral};
 use chrono::{DateTime, Duration, Utc};
-use edge_protocol::translate::mac_address_to_bytes;
 use edge_protocol::v2::{
     decode_proto, encode_proto, STATION_CURRENT_TIME_CHARACTERISTIC_UUID_16,
     STATION_EVENTS_CHARACTERISTIC_UUID_16, STATION_MAC_ADDR_CHARACTERISTIC_UUID_16,
@@ -264,4 +263,12 @@ async fn read_characteristic(
         }
     }
     Ok(vec![])
+}
+
+fn mac_address_to_bytes(value: &MacAddress) -> Result<[u8; 6], ()> {
+    value
+        .r#mac_address()
+        .clone()
+        .into_array()
+        .map_err(|_| ())
 }

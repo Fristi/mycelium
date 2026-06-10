@@ -203,7 +203,7 @@ mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
     use edge_protocol::{Measurement, MeasurementSerieEntry};
-    use sqlx::{sqlite::SqlitePoolOptions, Executor};
+    use sqlx::sqlite::SqlitePoolOptions;
 
     #[tokio::test]
     async fn test_insert_and_find_by_mac() {
@@ -251,8 +251,8 @@ mod tests {
 
         let found_entry = &found[0];
         assert_eq!(
-            found_entry.timestamp.timestamp(),
-            entry.timestamp.timestamp()
+            found_entry.timestamp.and_utc().timestamp(),
+            entry.timestamp.and_utc().timestamp()
         );
         assert_eq!(found_entry.value.battery, entry.value.battery);
         assert_eq!(found_entry.value.lux, entry.value.lux);
@@ -332,7 +332,7 @@ mod tests {
             wifi_password: "pass1".to_string(),
             auth0_access_token: "token1".to_string(),
             auth0_refresh_token: "refresh1".to_string(),
-            auth0_expires_at: NaiveDateTime::from_timestamp_opt(1_700_000_000, 0).unwrap(),
+            auth0_expires_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap().naive_utc(),
         };
         // Set the state
         let affected = repo.set_state(&state).await.expect("Unable to set state");
@@ -371,7 +371,7 @@ mod tests {
             wifi_password: "pass1".to_string(),
             auth0_access_token: "token1".to_string(),
             auth0_refresh_token: "refresh1".to_string(),
-            auth0_expires_at: NaiveDateTime::from_timestamp_opt(1_700_000_000, 0).unwrap(),
+            auth0_expires_at: Utc.timestamp_opt(1_700_000_000, 0).unwrap().naive_utc(),
         };
 
         let state2 = EdgeState {
@@ -379,7 +379,7 @@ mod tests {
             wifi_password: "pass2".to_string(),
             auth0_access_token: "token2".to_string(),
             auth0_refresh_token: "refresh2".to_string(),
-            auth0_expires_at: NaiveDateTime::from_timestamp_opt(1_800_000_000, 0).unwrap(),
+            auth0_expires_at: Utc.timestamp_opt(1_800_000_000, 0).unwrap().naive_utc(),
         };
 
         // Set the first state
@@ -387,8 +387,7 @@ mod tests {
         assert_eq!(affected1, 1);
 
         // Set the second state (should update)
-        let affected2 = repo.set_state(&state2).await.expect("Unable to set state");
-        // Depending on SQLite, this may be 1 or 0 if nothing changed, but at least it should not error
+        repo.set_state(&state2).await.expect("Unable to set state");
 
         // Get the state and check it's the updated one
         let result = repo.get_state().await.expect("Unable to get state");

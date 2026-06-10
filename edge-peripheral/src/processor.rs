@@ -170,7 +170,7 @@ pub async fn process<P: Processor>(
         .as_bytes()
         .try_into()
         .map_err(|_| anyhow::anyhow!("Invalid MAC address length"))?;
-    let mut rtc = Rtc::new(peripherals.LPWR);
+    let rtc = Rtc::new(peripherals.LPWR);
     let rng = Rng::new();
 
     match state {
@@ -207,10 +207,6 @@ pub async fn process<P: Processor>(
             .with_scl(peripherals.GPIO22);
 
             let i2c_pcb_refcell = RefCell::new(i2c_pcb);
-
-            let output_config_ext = OutputConfig::default()
-                .with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain)
-                .with_pull(esp_hal::gpio::Pull::Up);
 
             let i2c_ext = esp_hal::i2c::master::I2c::new(
                 peripherals.I2C1,
@@ -252,10 +248,6 @@ pub async fn process<P: Processor>(
             .with_scl(peripherals.GPIO22);
 
             let i2c_pcb_refcell = RefCell::new(i2c_pcb);
-
-            let output_config_ext = OutputConfig::default()
-                .with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain)
-                .with_pull(esp_hal::gpio::Pull::Up);
 
             let i2c_ext = esp_hal::i2c::master::I2c::new(
                 peripherals.I2C1,
