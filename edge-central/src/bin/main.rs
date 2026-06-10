@@ -10,7 +10,7 @@ use aliri_reqwest::AccessTokenMiddleware;
 use aliri_tokens::{backoff, jitter, sources::{self, oauth2::dto::RefreshTokenCredentialsSource}, ClientId, RefreshToken, TokenLifetimeConfig, TokenWatcher};
 use anyhow::*;
 use dotenv::dotenv;
-use edge_client_backend::{apis::configuration::{Configuration}, models::{StationInsert, StationMeasurement}};
+use edge_client_backend::{apis::configuration::Configuration, models::StationInsert};
 use futures::{stream, StreamExt};
 use reqwest::{Client, Request, Url};
 use reqwest_middleware::ClientBuilder;
@@ -130,25 +130,32 @@ async fn work() -> anyhow::Result<()> {
 }
 
 async fn sync_measurements(configuration: &Configuration, m: PeripheralSyncResult) -> anyhow::Result<()> {
+    let mac = format!(
+        "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+        m.address[0], m.address[1], m.address[2], m.address[3], m.address[4], m.address[5]
+    );
 
-    let mac = format!("{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}", m.address[0], m.address[1], m.address[2], m.address[3], m.address[4], m.address[5]);
+    let payload = crate::measurements::backend_adapter::SyncPayload::from_events(m.events)?;
+
+    tracing::info!(
+        "Synced station {}: {} measurement(s), {} watering event(s)",
+        mac,
+        payload.measurements.len(),
+        payload.waterings.len()
+    );
+    for watering in &payload.waterings {
+        tracing::info!(
+            "  watering at {} for {} ms",
+            watering.timestamp.format("%Y-%m-%dT%H:%M:%SZ"),
+            watering.value.duration_msec
+        );
+    }
+
     let station_insert = StationInsert::new(mac, "Unnamed".to_string());
 
     let id = edge_client_backend::apis::default_api::add_station(&configuration, station_insert).await?;
-    let mut measurements = vec![];
-    let summary = StatusSummary::from_measurements(&m.measurements);
-
-    for measurement in m.measurements {
-        measurements.push(StationMeasurement {
-            on: measurement.timestamp.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
-            battery_voltage: 0_f64,
-            temperature: measurement.measurement.temperature as f64,
-            humidity: measurement.measurement.humidity as f64,
-            lux: measurement.measurement.lux as f64,
-            soil_pf: measurement.measurement.soil_pf as f64,
-            tank_pf: 0_f64
-        });
-    }
+    let summary = StatusSummary::from_measurements(&payload.measurements);
+    let measurements = payload.to_station_measurements();
 
     edge_client_backend::apis::default_api::checkin_station(&configuration, id.to_string().as_str(), Some(measurements)).await?;
     match summary {

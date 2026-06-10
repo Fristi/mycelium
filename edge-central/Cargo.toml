@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 edge-protocol = { path = "../edge-protocol" }
+timeseries = { git = "https://github.com/Fristi/timeseries", rev = "869521bb62a99a101e8f0f7d60fadac2a2a046ba" }
 edge-onboarding-ble = { path = "../edge-onboarding-ble" }
 edge-client-backend = { path = "../clients/rs" }
 tokio = { version = "1", features = ["full"] }

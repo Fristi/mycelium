@@ -1,8 +1,10 @@
 use std::{pin::Pin, time::Duration};
 
-use chrono::{TimeDelta, Utc};
+use chrono::{NaiveDateTime, TimeDelta, Utc};
+use edge_protocol::translate::encode_measurements_only;
 use edge_protocol::{Measurement, MeasurementSerieEntry};
 use futures::{stream, Stream};
+use timeseries::Series;
 use tokio::time::sleep;
 
 use crate::measurements::types::{PeripheralSyncResult, PeripheralSyncResultStreamProvider};
@@ -23,22 +25,25 @@ impl PeripheralSyncResultStreamProvider for RandomPeripheralSyncResultStreamProv
         let delay = Duration::from_millis(self.delay.num_milliseconds() as u64);
         let mac = self.mac;
         let stream = stream::unfold((delay, mac), |(delay, mac)| async move {
-            let mut measurements = vec![];
+            let mut series: Series<6, NaiveDateTime, Measurement> =
+                Series::new(Measurement::MAX_DEVIATION);
 
             for _ in 0..6 {
                 let measurement = random_measurement();
                 let serie_entry = MeasurementSerieEntry {
                     timestamp: Utc::now().naive_utc(),
-                    measurement,
+                    value: measurement,
                 };
-
-                measurements.push(serie_entry);
+                series
+                    .append_monotonic(serie_entry.timestamp, serie_entry.value);
             }
+
+            let events = encode_measurements_only(&series).expect("random series fits in events");
 
             let result = PeripheralSyncResult {
                 address: mac,
                 time_drift: TimeDelta::zero(),
-                measurements,
+                events,
             };
 
             sleep(delay).await;

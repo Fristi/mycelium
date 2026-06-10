@@ -390,6 +390,7 @@ dependencies = [
  "esp-println",
  "esp-radio",
  "esp-rtos",
+ "heapless 0.8.0",
  "log",
  "nb 1.1.0",
  "shtcx2",

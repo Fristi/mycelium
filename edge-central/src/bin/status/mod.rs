@@ -58,10 +58,10 @@ impl StatusSummary {
         let mut light_sum = 0.0;
 
         for m in measurements {
-            temp_sum += m.measurement.temperature;
-            humidity_sum += m.measurement.humidity;
-            soil_sum += m.measurement.soil_pf;
-            light_sum += m.measurement.lux;
+            temp_sum += m.value.temperature;
+            humidity_sum += m.value.humidity;
+            soil_sum += m.value.soil_pf;
+            light_sum += m.value.lux;
         }
 
         let count = measurements.len() as f32;

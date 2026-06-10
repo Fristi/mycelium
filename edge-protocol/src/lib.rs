@@ -1,7 +1,9 @@
 #![cfg_attr(not(test), no_std)]
 
+pub mod translate;
 pub mod v2_proto;
 pub mod v2;
+pub mod wire;
 
 #[cfg(feature = "gatt")]
 pub mod gatt;
@@ -10,10 +12,19 @@ use chrono::NaiveDateTime;
 use timeseries::Deviate;
 
 #[derive(Debug, Clone, Copy)]
-pub struct MeasurementSerieEntry {
+pub struct SerieEntry<T> {
     pub timestamp: NaiveDateTime,
-    pub measurement: Measurement,
+    pub value: T,
 }
+
+pub type MeasurementSerieEntry = SerieEntry<Measurement>;
+
+#[derive(Debug, Clone, Copy)]
+pub struct Watering {
+    pub duration_msec: u32,
+}
+
+pub type WateringSerieEntry = SerieEntry<Watering>;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Measurement {

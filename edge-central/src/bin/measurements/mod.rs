@@ -6,9 +6,10 @@ use crate::measurements::random::RandomPeripheralSyncResultStreamProvider;
 use crate::measurements::types::PeripheralSyncResultStreamProvider;
 use crate::ports::plant_profiles::PlantProfilePort;
 
+pub mod backend_adapter;
+pub mod btleplug;
 pub mod random;
 pub mod types;
-pub mod btleplug;
 
 pub async fn make_peripheral_sync_stream_provider(
     mode: &PeripheralSyncMode,

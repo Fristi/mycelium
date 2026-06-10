@@ -6,13 +6,13 @@ use btleplug::api::bleuuid::uuid_from_u16;
 use btleplug::api::{Central, Manager as _, Peripheral as _, ScanFilter, WriteType};
 use btleplug::platform::{Adapter, Manager, Peripheral};
 use chrono::{DateTime, Duration, Utc};
+use edge_protocol::translate::mac_address_to_bytes;
 use edge_protocol::v2::{
-    decode_mac_address, decode_proto, encode_proto, events_to_measurement_entries,
-    STATION_CURRENT_TIME_CHARACTERISTIC_UUID_16, STATION_EVENTS_CHARACTERISTIC_UUID_16,
-    STATION_MAC_ADDR_CHARACTERISTIC_UUID_16, STATION_PLANT_PROFILE_CHARACTERISTIC_UUID_16,
-    STATION_SERVICE_UUID_16,
+    decode_proto, encode_proto, STATION_CURRENT_TIME_CHARACTERISTIC_UUID_16,
+    STATION_EVENTS_CHARACTERISTIC_UUID_16, STATION_MAC_ADDR_CHARACTERISTIC_UUID_16,
+    STATION_PLANT_PROFILE_CHARACTERISTIC_UUID_16, STATION_SERVICE_UUID_16,
 };
-use edge_protocol::v2_proto::{Events, Timestamp};
+use edge_protocol::v2_proto::{Events, MacAddress, Timestamp};
 use futures::Stream;
 use tokio::time::{sleep, timeout, Duration as TokioDuration};
 use tracing::info;
@@ -154,13 +154,10 @@ async fn sync(
         })?;
 
     let mac_addr_data = read_characteristic(&peripheral, mac_addr_char).await?;
-    let address = decode_mac_address(&mac_addr_data).map_err(|e| {
-        anyhow!(
-            "Failed to decode MacAddress from {} bytes {:02x?}: {e:?}",
-            mac_addr_data.len(),
-            mac_addr_data
-        )
-    })?;
+    let mac_address: MacAddress = decode_proto(&mac_addr_data)
+        .map_err(|e| anyhow!("Failed to decode MacAddress protobuf: {e:?}"))?;
+    let address = mac_address_to_bytes(&mac_address)
+        .map_err(|_| anyhow!("MacAddress characteristic did not contain 6 bytes"))?;
 
     info!(
         "Found device {:?} (station mac {:02x?})",
@@ -183,17 +180,12 @@ async fn sync(
     let events: Events = decode_proto(&events_data)
         .map_err(|e| anyhow!("Failed to decode Events protobuf: {e:?}"))?;
 
-    let measurements = events_to_measurement_entries::<32>(events)
-        .map_err(|_| anyhow!("Failed to convert events to measurements"))?
-        .into_iter()
-        .collect();
-
     peripheral.disconnect().await?;
 
     Ok(PeripheralSyncResult {
         address,
         time_drift,
-        measurements,
+        events,
     })
 }
 

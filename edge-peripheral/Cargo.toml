@@ -12,6 +12,7 @@ shtcx2 = "0.1"
 bh1730fvc = "0.2"
 timeseries = { git = "https://github.com/Fristi/timeseries", rev = "869521bb62a99a101e8f0f7d60fadac2a2a046ba" }
 edge-protocol = { path = "../edge-protocol", features = ["gatt"] }
+heapless = "0.8"
 log = "0.4.29"
 
 embedded-hal = "1.0.0"

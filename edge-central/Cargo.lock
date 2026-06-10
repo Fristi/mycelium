@@ -827,6 +827,7 @@ dependencies = [
  "serial_test",
  "sqlx",
  "ssd1306",
+ "timeseries",
  "tokio",
  "tracing",
  "tracing-subscriber",

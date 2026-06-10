@@ -1,14 +1,14 @@
 use std::pin::Pin;
 
 use chrono::Duration;
-use edge_protocol::MeasurementSerieEntry;
+use edge_protocol::v2_proto::Events;
 use futures::Stream;
 
 #[derive(Debug)]
 pub struct PeripheralSyncResult {
     pub address: [u8; 6],
     pub time_drift: Duration,
-    pub measurements: Vec<MeasurementSerieEntry>,
+    pub events: Events,
 }
 
 pub trait PeripheralSyncResultStreamProvider {

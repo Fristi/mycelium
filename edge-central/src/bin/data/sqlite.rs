@@ -28,18 +28,18 @@ impl MeasurementSerieEntryRow {
             id,
             mac: mac.to_vec(),
             timestamp: entry.timestamp,
-            battery: entry.measurement.battery as i64,
-            lux: entry.measurement.lux as f64,
-            temperature: entry.measurement.temperature as f64,
-            humidity: entry.measurement.humidity as f64,
-            soil_pf: entry.measurement.soil_pf as f64
+            battery: entry.value.battery as i64,
+            lux: entry.value.lux as f64,
+            temperature: entry.value.temperature as f64,
+            humidity: entry.value.humidity as f64,
+            soil_pf: entry.value.soil_pf as f64
         }
     }
 
     pub fn to_measurement_serie_entry(&self) -> edge_protocol::MeasurementSerieEntry {
         edge_protocol::MeasurementSerieEntry {
             timestamp: self.timestamp,
-            measurement: edge_protocol::Measurement {
+            value: edge_protocol::Measurement {
                 battery: self.battery.try_into().unwrap_or(100),
                 lux: self.lux as f32,
                 temperature: self.temperature as f32,
@@ -228,7 +228,7 @@ mod tests {
 
         let entry = MeasurementSerieEntry {
             timestamp: Utc.timestamp_opt(1_700_000_000, 0).unwrap().naive_utc(),
-            measurement: Measurement {
+            value: Measurement {
                 battery: 30,
                 lux: 123.4,
                 temperature: 22.5,
@@ -254,14 +254,14 @@ mod tests {
             found_entry.timestamp.timestamp(),
             entry.timestamp.timestamp()
         );
-        assert_eq!(found_entry.measurement.battery, entry.measurement.battery);
-        assert_eq!(found_entry.measurement.lux, entry.measurement.lux);
+        assert_eq!(found_entry.value.battery, entry.value.battery);
+        assert_eq!(found_entry.value.lux, entry.value.lux);
         assert_eq!(
-            found_entry.measurement.temperature,
-            entry.measurement.temperature
+            found_entry.value.temperature,
+            entry.value.temperature
         );
-        assert_eq!(found_entry.measurement.humidity, entry.measurement.humidity);
-        assert_eq!(found_entry.measurement.soil_pf, entry.measurement.soil_pf);
+        assert_eq!(found_entry.value.humidity, entry.value.humidity);
+        assert_eq!(found_entry.value.soil_pf, entry.value.soil_pf);
     }
 
     #[tokio::test]
