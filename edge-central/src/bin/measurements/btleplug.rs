@@ -7,11 +7,12 @@ use btleplug::api::{Central, Manager as _, Peripheral as _, ScanFilter, WriteTyp
 use btleplug::platform::{Adapter, Manager, Peripheral};
 use chrono::{DateTime, Duration, Utc};
 use edge_protocol::v2::{
-    decode_proto, encode_proto, STATION_CURRENT_TIME_CHARACTERISTIC_UUID_16,
+    decode_proto, encode_proto, parse_mac_address_bytes,
+    STATION_CURRENT_TIME_CHARACTERISTIC_UUID_16,
     STATION_EVENTS_CHARACTERISTIC_UUID_16, STATION_MAC_ADDR_CHARACTERISTIC_UUID_16,
     STATION_PLANT_PROFILE_CHARACTERISTIC_UUID_16, STATION_SERVICE_UUID_16,
 };
-use edge_protocol::v2_proto::{Events, MacAddress, Timestamp};
+use edge_protocol::v2_proto::{Events, Timestamp};
 use futures::Stream;
 use tokio::time::{sleep, timeout, Duration as TokioDuration};
 use tracing::info;
@@ -153,9 +154,7 @@ async fn sync(
         })?;
 
     let mac_addr_data = read_characteristic(&peripheral, mac_addr_char).await?;
-    let mac_address: MacAddress = decode_proto(&mac_addr_data)
-        .map_err(|e| anyhow!("Failed to decode MacAddress protobuf: {e:?}"))?;
-    let address = mac_address_to_bytes(&mac_address)
+    let address = parse_mac_address_bytes(&mac_addr_data)
         .map_err(|_| anyhow!("MacAddress characteristic did not contain 6 bytes"))?;
 
     info!(
@@ -265,10 +264,3 @@ async fn read_characteristic(
     Ok(vec![])
 }
 
-fn mac_address_to_bytes(value: &MacAddress) -> Result<[u8; 6], ()> {
-    value
-        .r#mac_address()
-        .clone()
-        .into_array()
-        .map_err(|_| ())
-}

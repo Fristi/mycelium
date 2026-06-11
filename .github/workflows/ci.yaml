@@ -15,7 +15,7 @@ jobs:
           version: "latest"
           cloud-token: ${{ secrets.DAGGER_CLOUD_TOKEN }}
       - name: Build rust client
-        run: create-client rust rs | export clients/rs
+        run: create-client rust edge-client-backend | export clients/rs
         shell: dagger {0}
       - name: Build ts-axios client
         run: create-client typescript-axios ts-axios | export clients/ts-axios

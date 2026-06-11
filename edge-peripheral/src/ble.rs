@@ -35,8 +35,8 @@ impl StationService {
     fn merge_into(&self, server: &Server<'_>, base: &GattSyncSession) -> Result<GattSyncSession, Error> {
         Ok(GattSyncSession {
             mac: base.mac,
-            events: self.events.get(&server)?,
-            current_profile: self.current_profile.get(&server)?,
+            events: Events::default(), // self.events.get(&server)?,
+            current_profile: PlantProfileSetting::default(), // self.current_profile.get(&server)?,
             current_time: self.current_time.get(&server)?,
         })
     }

@@ -56,3 +56,54 @@ pub fn decode_proto<T: MessageDecode + Default>(
     Ok(message)
 }
 
+/// Parse a station MAC from a GATT characteristic value.
+///
+/// Peripherals expose exactly six raw octets on the wire (zero bytes included).
+/// Protobuf-encoded values are accepted as a fallback for older firmware.
+pub fn parse_mac_address_bytes(data: &[u8]) -> Result<[u8; 6], ()> {
+    if data.len() == 6 {
+        return data.try_into().map_err(|_| ());
+    }
+
+    let mac = decode_proto::<crate::v2_proto::MacAddress>(data).map_err(|_| ())?;
+    mac.r#mac_address.clone().into_array().map_err(|_| ())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::v2_proto::MacAddress;
+
+    #[test]
+    fn parse_mac_address_bytes_accepts_raw_six_octets_with_zeros() {
+        let mac = [0x00, 0x11, 0x22, 0x00, 0x44, 0x55];
+        assert_eq!(parse_mac_address_bytes(&mac), Ok(mac));
+    }
+
+    #[test]
+    fn parse_mac_address_bytes_accepts_all_zero_mac() {
+        let mac = [0x00; 6];
+        assert_eq!(parse_mac_address_bytes(&mac), Ok(mac));
+    }
+
+    #[test]
+    fn parse_mac_address_bytes_rejects_empty_payload() {
+        assert!(parse_mac_address_bytes(&[]).is_err());
+    }
+
+    #[test]
+    fn parse_mac_address_bytes_accepts_protobuf_encoded_mac() {
+        let mut mac_address = MacAddress::default();
+        mac_address
+            .set_mac_address(heapless::Vec::from_slice(&[0x00, 0xaa, 0xbb, 0xcc, 0xdd, 0xee]).unwrap());
+
+        let mut buf = [0u8; 8];
+        let len = encode_proto(&mac_address, &mut buf).unwrap();
+
+        assert_eq!(
+            parse_mac_address_bytes(&buf[..len]),
+            Ok([0x00, 0xaa, 0xbb, 0xcc, 0xdd, 0xee])
+        );
+    }
+}
+

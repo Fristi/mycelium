@@ -51,7 +51,7 @@ gen-client lang name:
     dagger -c "create-client {{lang}} {{name}} | export clients/{{name}}"
 
 gen-client-rs:
-    just gen-client rust rs
+    dagger -c "create-client rust edge-client-backend | export clients/rs"
 
 gen-client-ts-axios:
     just gen-client typescript-axios ts-axios
