@@ -6,7 +6,7 @@ use trouble_host::BleHostError;
 #[expect(unused_imports, reason = "loads AsGatt/FromGatt impls for proto GATT types")]
 use edge_protocol::gatt as _;
 use edge_protocol::v2::*;
-use edge_protocol::v2_proto::{Events, MacAddress, PlantProfile, SyncState, Timestamp};
+use edge_protocol::v2_proto::{Events, MacAddress, PlantProfileSetting, SyncState, Timestamp};
 use esp_hal::rtc_cntl::Rtc;
 use log::*;
 
@@ -24,7 +24,7 @@ struct StationService {
     #[characteristic(uuid = STATION_EVENTS_CHARACTERISTIC_UUID_16, read)]
     events: Events,
     #[characteristic(uuid = STATION_PLANT_PROFILE_CHARACTERISTIC_UUID_16, read, write)]
-    current_profile: PlantProfile,
+    current_profile: PlantProfileSetting,
     #[characteristic(uuid = STATION_CURRENT_TIME_CHARACTERISTIC_UUID_16, read, write)]
     current_time: Timestamp,
     #[characteristic(uuid = STATION_SYNC_STATE_CHARACTERISTIC_UUID_16, read, write)]
@@ -54,7 +54,7 @@ pub struct GattSyncSession {
     pub events: Events,
     /// Written by central over GATT; retained for a future plant-profile consumer.
     #[allow(dead_code)]
-    pub current_profile: PlantProfile,
+    pub current_profile: PlantProfileSetting,
     pub current_time: Timestamp,
 }
 
@@ -63,7 +63,7 @@ impl GattSyncSession {
         Self {
             mac,
             events: Events::default(),
-            current_profile: PlantProfile::default(),
+            current_profile: PlantProfileSetting { profile: None },
             current_time: Timestamp::default(),
         }
     }
@@ -72,7 +72,7 @@ impl GattSyncSession {
         Ok(Self {
             mac,
             events: data.to_events()?,
-            current_profile: PlantProfile::default(),
+            current_profile: PlantProfileSetting { profile: data.plant_profile.clone() },
             current_time: Timestamp::default(),
         })
     }
@@ -81,6 +81,7 @@ impl GattSyncSession {
         let address = mac_address_from_bytes(self.mac).map_err(|_| Error::InvalidValue)?;
         server.station_service.address.set(&server, &address)?;
         server.station_service.events.set(&server, &self.events)?;
+        server.station_service.current_profile.set(&server, &self.current_profile)?;
         server
             .station_service
             .current_time
@@ -246,14 +247,13 @@ fn handle_gatt_write<P: PacketPool>(
         let ts: Timestamp = write
             .value(&server.station_service.current_time)
             .map_err(|_| Error::InvalidValue)?;
-        if ts.timestamp != 0 {
-            rtc.set_unix_timestamp(ts.timestamp);
-            server
-                .station_service
-                .sync_state
-                .set(server, &SyncState::Done)?;
-            info!("[gatt] RTC set to unix {}", ts.timestamp);
-        }
+
+        rtc.set_unix_timestamp(ts.timestamp);
+                server
+                    .station_service
+                    .sync_state
+                    .set(server, &SyncState::Done)?;
+
         return Ok(());
     }
 

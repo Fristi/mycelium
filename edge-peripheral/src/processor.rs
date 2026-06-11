@@ -78,15 +78,6 @@ impl Processor for DebugProcessor {
             .await
             .map_err(|e| anyhow::anyhow!("BLE time sync failed: {e:?}"))?;
 
-        if station_state.current_time.timestamp != 0 {
-            info!(
-                "Time synced to unix {}",
-                station_state.current_time.timestamp
-            );
-        } else {
-            info!("BLE session ended without time write");
-        }
-
         embassy_time::Timer::after_millis(300).await;
 
         Ok(state::DeviceState::Buffering(

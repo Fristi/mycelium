@@ -89,5 +89,5 @@ impl FromGatt for SyncState {
     }
 }
 
-as_gatt!(PlantProfile, Timestamp, Events, MacAddress);
-from_gatt!(PlantProfile, Timestamp, Events, MacAddress);
+as_gatt!(PlantProfile, Timestamp, Events, MacAddress, PlantProfileSetting);
+from_gatt!(PlantProfile, Timestamp, Events, MacAddress, PlantProfileSetting);

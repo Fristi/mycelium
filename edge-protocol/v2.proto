@@ -14,6 +14,10 @@ message PlantProfile {
   Interval soil_ec       = 6;
 }
 
+message PlantProfileSetting {
+    optional PlantProfile profile = 1;
+}
+
 message Timestamp {
     uint32 timestamp = 1;
 }
@@ -26,7 +30,7 @@ message Measurement {
   float  soil_pf     = 5;
 }
 
-message MeasurementEntry {
+message MeasurementRange {
                 Timestamp   start       = 1;
     optional    Timestamp   end         = 2;
                 Measurement measurement = 3;
@@ -41,7 +45,7 @@ message WateringEntry {
 
 message Event {
     oneof event {
-        MeasurementEntry measurement    = 1;
+        MeasurementRange measurement    = 1;
         WateringEntry    watering       = 2;
     }
 }

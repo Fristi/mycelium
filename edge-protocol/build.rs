@@ -5,6 +5,7 @@ fn main() {
         micropb_gen::Config::new()
             .max_bytes(6)
             .max_len(16)
+            .optional_repr(micropb_gen::config::OptionalRepr::Option)
             .enum_int_size(micropb_gen::config::IntSize::S8)
     );
     gen.compile_protos(&["v2.proto"], "src/v2_proto.rs").unwrap();

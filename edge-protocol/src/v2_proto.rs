@@ -147,68 +147,42 @@ impl ::micropb::MessageEncode for Interval {
         size
     }
 }
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct PlantProfile {
-    /// *Note:* The presence of this field is tracked separately in the `_has` field. It's recommended to access this field via the accessor rather than directly.
-    pub r#light_mmol: Interval,
-    /// *Note:* The presence of this field is tracked separately in the `_has` field. It's recommended to access this field via the accessor rather than directly.
-    pub r#light_lux: Interval,
-    /// *Note:* The presence of this field is tracked separately in the `_has` field. It's recommended to access this field via the accessor rather than directly.
-    pub r#temperature: Interval,
-    /// *Note:* The presence of this field is tracked separately in the `_has` field. It's recommended to access this field via the accessor rather than directly.
-    pub r#humidity: Interval,
-    /// *Note:* The presence of this field is tracked separately in the `_has` field. It's recommended to access this field via the accessor rather than directly.
-    pub r#soil_moisture: Interval,
-    /// *Note:* The presence of this field is tracked separately in the `_has` field. It's recommended to access this field via the accessor rather than directly.
-    pub r#soil_ec: Interval,
-    /// Tracks presence of optional and message fields
-    pub _has: PlantProfile_::_Hazzer,
-}
-impl ::core::cmp::PartialEq for PlantProfile {
-    fn eq(&self, other: &Self) -> bool {
-        let mut ret = true;
-        ret &= (self.r#light_mmol() == other.r#light_mmol());
-        ret &= (self.r#light_lux() == other.r#light_lux());
-        ret &= (self.r#temperature() == other.r#temperature());
-        ret &= (self.r#humidity() == other.r#humidity());
-        ret &= (self.r#soil_moisture() == other.r#soil_moisture());
-        ret &= (self.r#soil_ec() == other.r#soil_ec());
-        ret
-    }
+    pub r#light_mmol: ::core::option::Option<Interval>,
+    pub r#light_lux: ::core::option::Option<Interval>,
+    pub r#temperature: ::core::option::Option<Interval>,
+    pub r#humidity: ::core::option::Option<Interval>,
+    pub r#soil_moisture: ::core::option::Option<Interval>,
+    pub r#soil_ec: ::core::option::Option<Interval>,
 }
 impl PlantProfile {
     /// Return a reference to `light_mmol` as an `Option`
     #[inline]
     pub fn r#light_mmol(&self) -> ::core::option::Option<&Interval> {
-        self._has.r#light_mmol().then_some(&self.r#light_mmol)
+        self.r#light_mmol.as_ref()
     }
     /// Set the value and presence of `light_mmol`
     #[inline]
     pub fn set_light_mmol(&mut self, value: Interval) -> &mut Self {
-        self._has.set_light_mmol();
-        self.r#light_mmol = value.into();
+        self.r#light_mmol = ::core::option::Option::Some(value.into());
         self
     }
     /// Return a mutable reference to `light_mmol` as an `Option`
     #[inline]
     pub fn mut_light_mmol(&mut self) -> ::core::option::Option<&mut Interval> {
-        self._has.r#light_mmol().then_some(&mut self.r#light_mmol)
+        self.r#light_mmol.as_mut()
     }
     /// Clear the presence of `light_mmol`
     #[inline]
     pub fn clear_light_mmol(&mut self) -> &mut Self {
-        self._has.clear_light_mmol();
+        self.r#light_mmol = ::core::option::Option::None;
         self
     }
     /// Take the value of `light_mmol` and clear its presence
     #[inline]
     pub fn take_light_mmol(&mut self) -> ::core::option::Option<Interval> {
-        let val = self
-            ._has
-            .r#light_mmol()
-            .then(|| ::core::mem::take(&mut self.r#light_mmol));
-        self._has.clear_light_mmol();
-        val
+        self.r#light_mmol.take()
     }
     /// Builder method that sets the value of `light_mmol`. Useful for initializing the message.
     #[inline]
@@ -219,35 +193,29 @@ impl PlantProfile {
     /// Return a reference to `light_lux` as an `Option`
     #[inline]
     pub fn r#light_lux(&self) -> ::core::option::Option<&Interval> {
-        self._has.r#light_lux().then_some(&self.r#light_lux)
+        self.r#light_lux.as_ref()
     }
     /// Set the value and presence of `light_lux`
     #[inline]
     pub fn set_light_lux(&mut self, value: Interval) -> &mut Self {
-        self._has.set_light_lux();
-        self.r#light_lux = value.into();
+        self.r#light_lux = ::core::option::Option::Some(value.into());
         self
     }
     /// Return a mutable reference to `light_lux` as an `Option`
     #[inline]
     pub fn mut_light_lux(&mut self) -> ::core::option::Option<&mut Interval> {
-        self._has.r#light_lux().then_some(&mut self.r#light_lux)
+        self.r#light_lux.as_mut()
     }
     /// Clear the presence of `light_lux`
     #[inline]
     pub fn clear_light_lux(&mut self) -> &mut Self {
-        self._has.clear_light_lux();
+        self.r#light_lux = ::core::option::Option::None;
         self
     }
     /// Take the value of `light_lux` and clear its presence
     #[inline]
     pub fn take_light_lux(&mut self) -> ::core::option::Option<Interval> {
-        let val = self
-            ._has
-            .r#light_lux()
-            .then(|| ::core::mem::take(&mut self.r#light_lux));
-        self._has.clear_light_lux();
-        val
+        self.r#light_lux.take()
     }
     /// Builder method that sets the value of `light_lux`. Useful for initializing the message.
     #[inline]
@@ -258,35 +226,29 @@ impl PlantProfile {
     /// Return a reference to `temperature` as an `Option`
     #[inline]
     pub fn r#temperature(&self) -> ::core::option::Option<&Interval> {
-        self._has.r#temperature().then_some(&self.r#temperature)
+        self.r#temperature.as_ref()
     }
     /// Set the value and presence of `temperature`
     #[inline]
     pub fn set_temperature(&mut self, value: Interval) -> &mut Self {
-        self._has.set_temperature();
-        self.r#temperature = value.into();
+        self.r#temperature = ::core::option::Option::Some(value.into());
         self
     }
     /// Return a mutable reference to `temperature` as an `Option`
     #[inline]
     pub fn mut_temperature(&mut self) -> ::core::option::Option<&mut Interval> {
-        self._has.r#temperature().then_some(&mut self.r#temperature)
+        self.r#temperature.as_mut()
     }
     /// Clear the presence of `temperature`
     #[inline]
     pub fn clear_temperature(&mut self) -> &mut Self {
-        self._has.clear_temperature();
+        self.r#temperature = ::core::option::Option::None;
         self
     }
     /// Take the value of `temperature` and clear its presence
     #[inline]
     pub fn take_temperature(&mut self) -> ::core::option::Option<Interval> {
-        let val = self
-            ._has
-            .r#temperature()
-            .then(|| ::core::mem::take(&mut self.r#temperature));
-        self._has.clear_temperature();
-        val
+        self.r#temperature.take()
     }
     /// Builder method that sets the value of `temperature`. Useful for initializing the message.
     #[inline]
@@ -297,35 +259,29 @@ impl PlantProfile {
     /// Return a reference to `humidity` as an `Option`
     #[inline]
     pub fn r#humidity(&self) -> ::core::option::Option<&Interval> {
-        self._has.r#humidity().then_some(&self.r#humidity)
+        self.r#humidity.as_ref()
     }
     /// Set the value and presence of `humidity`
     #[inline]
     pub fn set_humidity(&mut self, value: Interval) -> &mut Self {
-        self._has.set_humidity();
-        self.r#humidity = value.into();
+        self.r#humidity = ::core::option::Option::Some(value.into());
         self
     }
     /// Return a mutable reference to `humidity` as an `Option`
     #[inline]
     pub fn mut_humidity(&mut self) -> ::core::option::Option<&mut Interval> {
-        self._has.r#humidity().then_some(&mut self.r#humidity)
+        self.r#humidity.as_mut()
     }
     /// Clear the presence of `humidity`
     #[inline]
     pub fn clear_humidity(&mut self) -> &mut Self {
-        self._has.clear_humidity();
+        self.r#humidity = ::core::option::Option::None;
         self
     }
     /// Take the value of `humidity` and clear its presence
     #[inline]
     pub fn take_humidity(&mut self) -> ::core::option::Option<Interval> {
-        let val = self
-            ._has
-            .r#humidity()
-            .then(|| ::core::mem::take(&mut self.r#humidity));
-        self._has.clear_humidity();
-        val
+        self.r#humidity.take()
     }
     /// Builder method that sets the value of `humidity`. Useful for initializing the message.
     #[inline]
@@ -336,35 +292,29 @@ impl PlantProfile {
     /// Return a reference to `soil_moisture` as an `Option`
     #[inline]
     pub fn r#soil_moisture(&self) -> ::core::option::Option<&Interval> {
-        self._has.r#soil_moisture().then_some(&self.r#soil_moisture)
+        self.r#soil_moisture.as_ref()
     }
     /// Set the value and presence of `soil_moisture`
     #[inline]
     pub fn set_soil_moisture(&mut self, value: Interval) -> &mut Self {
-        self._has.set_soil_moisture();
-        self.r#soil_moisture = value.into();
+        self.r#soil_moisture = ::core::option::Option::Some(value.into());
         self
     }
     /// Return a mutable reference to `soil_moisture` as an `Option`
     #[inline]
     pub fn mut_soil_moisture(&mut self) -> ::core::option::Option<&mut Interval> {
-        self._has.r#soil_moisture().then_some(&mut self.r#soil_moisture)
+        self.r#soil_moisture.as_mut()
     }
     /// Clear the presence of `soil_moisture`
     #[inline]
     pub fn clear_soil_moisture(&mut self) -> &mut Self {
-        self._has.clear_soil_moisture();
+        self.r#soil_moisture = ::core::option::Option::None;
         self
     }
     /// Take the value of `soil_moisture` and clear its presence
     #[inline]
     pub fn take_soil_moisture(&mut self) -> ::core::option::Option<Interval> {
-        let val = self
-            ._has
-            .r#soil_moisture()
-            .then(|| ::core::mem::take(&mut self.r#soil_moisture));
-        self._has.clear_soil_moisture();
-        val
+        self.r#soil_moisture.take()
     }
     /// Builder method that sets the value of `soil_moisture`. Useful for initializing the message.
     #[inline]
@@ -375,32 +325,29 @@ impl PlantProfile {
     /// Return a reference to `soil_ec` as an `Option`
     #[inline]
     pub fn r#soil_ec(&self) -> ::core::option::Option<&Interval> {
-        self._has.r#soil_ec().then_some(&self.r#soil_ec)
+        self.r#soil_ec.as_ref()
     }
     /// Set the value and presence of `soil_ec`
     #[inline]
     pub fn set_soil_ec(&mut self, value: Interval) -> &mut Self {
-        self._has.set_soil_ec();
-        self.r#soil_ec = value.into();
+        self.r#soil_ec = ::core::option::Option::Some(value.into());
         self
     }
     /// Return a mutable reference to `soil_ec` as an `Option`
     #[inline]
     pub fn mut_soil_ec(&mut self) -> ::core::option::Option<&mut Interval> {
-        self._has.r#soil_ec().then_some(&mut self.r#soil_ec)
+        self.r#soil_ec.as_mut()
     }
     /// Clear the presence of `soil_ec`
     #[inline]
     pub fn clear_soil_ec(&mut self) -> &mut Self {
-        self._has.clear_soil_ec();
+        self.r#soil_ec = ::core::option::Option::None;
         self
     }
     /// Take the value of `soil_ec` and clear its presence
     #[inline]
     pub fn take_soil_ec(&mut self) -> ::core::option::Option<Interval> {
-        let val = self._has.r#soil_ec().then(|| ::core::mem::take(&mut self.r#soil_ec));
-        self._has.clear_soil_ec();
-        val
+        self.r#soil_ec.take()
     }
     /// Builder method that sets the value of `soil_ec`. Useful for initializing the message.
     #[inline]
@@ -422,46 +369,52 @@ impl ::micropb::MessageDecode for PlantProfile {
             match tag.field_num() {
                 0 => return Err(::micropb::DecodeError::ZeroField),
                 1u32 => {
-                    let mut_ref = &mut self.r#light_mmol;
+                    let mut_ref = &mut *self
+                        .r#light_mmol
+                        .get_or_insert_with(::core::default::Default::default);
                     {
                         mut_ref.decode_len_delimited(decoder)?;
                     };
-                    self._has.set_light_mmol();
                 }
                 2u32 => {
-                    let mut_ref = &mut self.r#light_lux;
+                    let mut_ref = &mut *self
+                        .r#light_lux
+                        .get_or_insert_with(::core::default::Default::default);
                     {
                         mut_ref.decode_len_delimited(decoder)?;
                     };
-                    self._has.set_light_lux();
                 }
                 3u32 => {
-                    let mut_ref = &mut self.r#temperature;
+                    let mut_ref = &mut *self
+                        .r#temperature
+                        .get_or_insert_with(::core::default::Default::default);
                     {
                         mut_ref.decode_len_delimited(decoder)?;
                     };
-                    self._has.set_temperature();
                 }
                 4u32 => {
-                    let mut_ref = &mut self.r#humidity;
+                    let mut_ref = &mut *self
+                        .r#humidity
+                        .get_or_insert_with(::core::default::Default::default);
                     {
                         mut_ref.decode_len_delimited(decoder)?;
                     };
-                    self._has.set_humidity();
                 }
                 5u32 => {
-                    let mut_ref = &mut self.r#soil_moisture;
+                    let mut_ref = &mut *self
+                        .r#soil_moisture
+                        .get_or_insert_with(::core::default::Default::default);
                     {
                         mut_ref.decode_len_delimited(decoder)?;
                     };
-                    self._has.set_soil_moisture();
                 }
                 6u32 => {
-                    let mut_ref = &mut self.r#soil_ec;
+                    let mut_ref = &mut *self
+                        .r#soil_ec
+                        .get_or_insert_with(::core::default::Default::default);
                     {
                         mut_ref.decode_len_delimited(decoder)?;
                     };
-                    self._has.set_soil_ec();
                 }
                 _ => {
                     decoder.skip_wire_value(tag.wire_type())?;
@@ -615,167 +568,111 @@ impl ::micropb::MessageEncode for PlantProfile {
         size
     }
 }
-/// Inner types for `PlantProfile`
-pub mod PlantProfile_ {
-    /// Compact bitfield for tracking presence of optional and message fields
-    #[derive(Debug, Default, PartialEq, Clone)]
-    pub struct _Hazzer([u8; 1]);
-    impl _Hazzer {
-        /// New hazzer with all fields set to off
-        #[inline]
-        pub const fn _new() -> Self {
-            Self([0; 1])
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct PlantProfileSetting {
+    pub r#profile: ::core::option::Option<PlantProfile>,
+}
+impl PlantProfileSetting {
+    /// Return a reference to `profile` as an `Option`
+    #[inline]
+    pub fn r#profile(&self) -> ::core::option::Option<&PlantProfile> {
+        self.r#profile.as_ref()
+    }
+    /// Set the value and presence of `profile`
+    #[inline]
+    pub fn set_profile(&mut self, value: PlantProfile) -> &mut Self {
+        self.r#profile = ::core::option::Option::Some(value.into());
+        self
+    }
+    /// Return a mutable reference to `profile` as an `Option`
+    #[inline]
+    pub fn mut_profile(&mut self) -> ::core::option::Option<&mut PlantProfile> {
+        self.r#profile.as_mut()
+    }
+    /// Clear the presence of `profile`
+    #[inline]
+    pub fn clear_profile(&mut self) -> &mut Self {
+        self.r#profile = ::core::option::Option::None;
+        self
+    }
+    /// Take the value of `profile` and clear its presence
+    #[inline]
+    pub fn take_profile(&mut self) -> ::core::option::Option<PlantProfile> {
+        self.r#profile.take()
+    }
+    /// Builder method that sets the value of `profile`. Useful for initializing the message.
+    #[inline]
+    pub fn init_profile(mut self, value: PlantProfile) -> Self {
+        self.set_profile(value);
+        self
+    }
+}
+impl ::micropb::MessageDecode for PlantProfileSetting {
+    fn decode<IMPL_MICROPB_READ: ::micropb::PbRead>(
+        &mut self,
+        decoder: &mut ::micropb::PbDecoder<IMPL_MICROPB_READ>,
+        len: usize,
+    ) -> Result<(), ::micropb::DecodeError<IMPL_MICROPB_READ::Error>> {
+        use ::micropb::{PbBytes, PbString, PbVec, PbMap, FieldDecode};
+        let before = decoder.bytes_read();
+        while decoder.bytes_read() - before < len {
+            let tag = decoder.decode_tag()?;
+            match tag.field_num() {
+                0 => return Err(::micropb::DecodeError::ZeroField),
+                1u32 => {
+                    let mut_ref = &mut *self
+                        .r#profile
+                        .get_or_insert_with(::core::default::Default::default);
+                    {
+                        mut_ref.decode_len_delimited(decoder)?;
+                    };
+                }
+                _ => {
+                    decoder.skip_wire_value(tag.wire_type())?;
+                }
+            }
         }
-        /// Query presence of `light_mmol`
-        #[inline]
-        pub const fn r#light_mmol(&self) -> bool {
-            (self.0[0] & 1) != 0
+        Ok(())
+    }
+}
+impl ::micropb::MessageEncode for PlantProfileSetting {
+    const MAX_SIZE: ::core::option::Option<usize> = 'msg: {
+        let mut max_size = 0;
+        if let ::core::option::Option::Some(size) = ::micropb::const_map!(
+            ::micropb::const_map!(< PlantProfile as ::micropb::MessageEncode >
+            ::MAX_SIZE, | size | ::micropb::size::sizeof_len_record(size)), | size | size
+            + 1usize
+        ) {
+            max_size += size;
+        } else {
+            break 'msg (::core::option::Option::<usize>::None);
+        };
+        ::core::option::Option::Some(max_size)
+    };
+    fn encode<IMPL_MICROPB_WRITE: ::micropb::PbWrite>(
+        &self,
+        encoder: &mut ::micropb::PbEncoder<IMPL_MICROPB_WRITE>,
+    ) -> Result<(), IMPL_MICROPB_WRITE::Error> {
+        use ::micropb::{PbMap, FieldEncode};
+        {
+            if let ::core::option::Option::Some(val_ref) = self.r#profile() {
+                encoder.encode_varint32(10u32)?;
+                val_ref.encode_len_delimited(encoder)?;
+            }
         }
-        /// Set presence of `light_mmol`
-        #[inline]
-        pub const fn set_light_mmol(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem |= 1;
-            self
+        Ok(())
+    }
+    fn compute_size(&self) -> usize {
+        use ::micropb::{PbMap, FieldEncode};
+        let mut size = 0;
+        {
+            if let ::core::option::Option::Some(val_ref) = self.r#profile() {
+                size
+                    += 1usize
+                        + ::micropb::size::sizeof_len_record(val_ref.compute_size());
+            }
         }
-        /// Clear presence of `light_mmol`
-        #[inline]
-        pub const fn clear_light_mmol(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem &= !1;
-            self
-        }
-        /// Builder method that sets the presence of `light_mmol`. Useful for initializing the Hazzer.
-        #[inline]
-        pub const fn init_light_mmol(mut self) -> Self {
-            self.set_light_mmol();
-            self
-        }
-        /// Query presence of `light_lux`
-        #[inline]
-        pub const fn r#light_lux(&self) -> bool {
-            (self.0[0] & 2) != 0
-        }
-        /// Set presence of `light_lux`
-        #[inline]
-        pub const fn set_light_lux(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem |= 2;
-            self
-        }
-        /// Clear presence of `light_lux`
-        #[inline]
-        pub const fn clear_light_lux(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem &= !2;
-            self
-        }
-        /// Builder method that sets the presence of `light_lux`. Useful for initializing the Hazzer.
-        #[inline]
-        pub const fn init_light_lux(mut self) -> Self {
-            self.set_light_lux();
-            self
-        }
-        /// Query presence of `temperature`
-        #[inline]
-        pub const fn r#temperature(&self) -> bool {
-            (self.0[0] & 4) != 0
-        }
-        /// Set presence of `temperature`
-        #[inline]
-        pub const fn set_temperature(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem |= 4;
-            self
-        }
-        /// Clear presence of `temperature`
-        #[inline]
-        pub const fn clear_temperature(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem &= !4;
-            self
-        }
-        /// Builder method that sets the presence of `temperature`. Useful for initializing the Hazzer.
-        #[inline]
-        pub const fn init_temperature(mut self) -> Self {
-            self.set_temperature();
-            self
-        }
-        /// Query presence of `humidity`
-        #[inline]
-        pub const fn r#humidity(&self) -> bool {
-            (self.0[0] & 8) != 0
-        }
-        /// Set presence of `humidity`
-        #[inline]
-        pub const fn set_humidity(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem |= 8;
-            self
-        }
-        /// Clear presence of `humidity`
-        #[inline]
-        pub const fn clear_humidity(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem &= !8;
-            self
-        }
-        /// Builder method that sets the presence of `humidity`. Useful for initializing the Hazzer.
-        #[inline]
-        pub const fn init_humidity(mut self) -> Self {
-            self.set_humidity();
-            self
-        }
-        /// Query presence of `soil_moisture`
-        #[inline]
-        pub const fn r#soil_moisture(&self) -> bool {
-            (self.0[0] & 16) != 0
-        }
-        /// Set presence of `soil_moisture`
-        #[inline]
-        pub const fn set_soil_moisture(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem |= 16;
-            self
-        }
-        /// Clear presence of `soil_moisture`
-        #[inline]
-        pub const fn clear_soil_moisture(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem &= !16;
-            self
-        }
-        /// Builder method that sets the presence of `soil_moisture`. Useful for initializing the Hazzer.
-        #[inline]
-        pub const fn init_soil_moisture(mut self) -> Self {
-            self.set_soil_moisture();
-            self
-        }
-        /// Query presence of `soil_ec`
-        #[inline]
-        pub const fn r#soil_ec(&self) -> bool {
-            (self.0[0] & 32) != 0
-        }
-        /// Set presence of `soil_ec`
-        #[inline]
-        pub const fn set_soil_ec(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem |= 32;
-            self
-        }
-        /// Clear presence of `soil_ec`
-        #[inline]
-        pub const fn clear_soil_ec(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem &= !32;
-            self
-        }
-        /// Builder method that sets the presence of `soil_ec`. Useful for initializing the Hazzer.
-        #[inline]
-        pub const fn init_soil_ec(mut self) -> Self {
-            self.set_soil_ec();
-            self
-        }
+        size
     }
 }
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -1182,56 +1079,39 @@ impl ::micropb::MessageEncode for Measurement {
         size
     }
 }
-#[derive(Debug, Default, Clone)]
-pub struct MeasurementEntry {
-    /// *Note:* The presence of this field is tracked separately in the `_has` field. It's recommended to access this field via the accessor rather than directly.
-    pub r#start: Timestamp,
-    /// *Note:* The presence of this field is tracked separately in the `_has` field. It's recommended to access this field via the accessor rather than directly.
-    pub r#end: Timestamp,
-    /// *Note:* The presence of this field is tracked separately in the `_has` field. It's recommended to access this field via the accessor rather than directly.
-    pub r#measurement: Measurement,
-    /// Tracks presence of optional and message fields
-    pub _has: MeasurementEntry_::_Hazzer,
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct MeasurementRange {
+    pub r#start: ::core::option::Option<Timestamp>,
+    pub r#end: ::core::option::Option<Timestamp>,
+    pub r#measurement: ::core::option::Option<Measurement>,
 }
-impl ::core::cmp::PartialEq for MeasurementEntry {
-    fn eq(&self, other: &Self) -> bool {
-        let mut ret = true;
-        ret &= (self.r#start() == other.r#start());
-        ret &= (self.r#end() == other.r#end());
-        ret &= (self.r#measurement() == other.r#measurement());
-        ret
-    }
-}
-impl MeasurementEntry {
+impl MeasurementRange {
     /// Return a reference to `start` as an `Option`
     #[inline]
     pub fn r#start(&self) -> ::core::option::Option<&Timestamp> {
-        self._has.r#start().then_some(&self.r#start)
+        self.r#start.as_ref()
     }
     /// Set the value and presence of `start`
     #[inline]
     pub fn set_start(&mut self, value: Timestamp) -> &mut Self {
-        self._has.set_start();
-        self.r#start = value.into();
+        self.r#start = ::core::option::Option::Some(value.into());
         self
     }
     /// Return a mutable reference to `start` as an `Option`
     #[inline]
     pub fn mut_start(&mut self) -> ::core::option::Option<&mut Timestamp> {
-        self._has.r#start().then_some(&mut self.r#start)
+        self.r#start.as_mut()
     }
     /// Clear the presence of `start`
     #[inline]
     pub fn clear_start(&mut self) -> &mut Self {
-        self._has.clear_start();
+        self.r#start = ::core::option::Option::None;
         self
     }
     /// Take the value of `start` and clear its presence
     #[inline]
     pub fn take_start(&mut self) -> ::core::option::Option<Timestamp> {
-        let val = self._has.r#start().then(|| ::core::mem::take(&mut self.r#start));
-        self._has.clear_start();
-        val
+        self.r#start.take()
     }
     /// Builder method that sets the value of `start`. Useful for initializing the message.
     #[inline]
@@ -1242,32 +1122,29 @@ impl MeasurementEntry {
     /// Return a reference to `end` as an `Option`
     #[inline]
     pub fn r#end(&self) -> ::core::option::Option<&Timestamp> {
-        self._has.r#end().then_some(&self.r#end)
+        self.r#end.as_ref()
     }
     /// Set the value and presence of `end`
     #[inline]
     pub fn set_end(&mut self, value: Timestamp) -> &mut Self {
-        self._has.set_end();
-        self.r#end = value.into();
+        self.r#end = ::core::option::Option::Some(value.into());
         self
     }
     /// Return a mutable reference to `end` as an `Option`
     #[inline]
     pub fn mut_end(&mut self) -> ::core::option::Option<&mut Timestamp> {
-        self._has.r#end().then_some(&mut self.r#end)
+        self.r#end.as_mut()
     }
     /// Clear the presence of `end`
     #[inline]
     pub fn clear_end(&mut self) -> &mut Self {
-        self._has.clear_end();
+        self.r#end = ::core::option::Option::None;
         self
     }
     /// Take the value of `end` and clear its presence
     #[inline]
     pub fn take_end(&mut self) -> ::core::option::Option<Timestamp> {
-        let val = self._has.r#end().then(|| ::core::mem::take(&mut self.r#end));
-        self._has.clear_end();
-        val
+        self.r#end.take()
     }
     /// Builder method that sets the value of `end`. Useful for initializing the message.
     #[inline]
@@ -1278,35 +1155,29 @@ impl MeasurementEntry {
     /// Return a reference to `measurement` as an `Option`
     #[inline]
     pub fn r#measurement(&self) -> ::core::option::Option<&Measurement> {
-        self._has.r#measurement().then_some(&self.r#measurement)
+        self.r#measurement.as_ref()
     }
     /// Set the value and presence of `measurement`
     #[inline]
     pub fn set_measurement(&mut self, value: Measurement) -> &mut Self {
-        self._has.set_measurement();
-        self.r#measurement = value.into();
+        self.r#measurement = ::core::option::Option::Some(value.into());
         self
     }
     /// Return a mutable reference to `measurement` as an `Option`
     #[inline]
     pub fn mut_measurement(&mut self) -> ::core::option::Option<&mut Measurement> {
-        self._has.r#measurement().then_some(&mut self.r#measurement)
+        self.r#measurement.as_mut()
     }
     /// Clear the presence of `measurement`
     #[inline]
     pub fn clear_measurement(&mut self) -> &mut Self {
-        self._has.clear_measurement();
+        self.r#measurement = ::core::option::Option::None;
         self
     }
     /// Take the value of `measurement` and clear its presence
     #[inline]
     pub fn take_measurement(&mut self) -> ::core::option::Option<Measurement> {
-        let val = self
-            ._has
-            .r#measurement()
-            .then(|| ::core::mem::take(&mut self.r#measurement));
-        self._has.clear_measurement();
-        val
+        self.r#measurement.take()
     }
     /// Builder method that sets the value of `measurement`. Useful for initializing the message.
     #[inline]
@@ -1315,7 +1186,7 @@ impl MeasurementEntry {
         self
     }
 }
-impl ::micropb::MessageDecode for MeasurementEntry {
+impl ::micropb::MessageDecode for MeasurementRange {
     fn decode<IMPL_MICROPB_READ: ::micropb::PbRead>(
         &mut self,
         decoder: &mut ::micropb::PbDecoder<IMPL_MICROPB_READ>,
@@ -1328,25 +1199,28 @@ impl ::micropb::MessageDecode for MeasurementEntry {
             match tag.field_num() {
                 0 => return Err(::micropb::DecodeError::ZeroField),
                 1u32 => {
-                    let mut_ref = &mut self.r#start;
+                    let mut_ref = &mut *self
+                        .r#start
+                        .get_or_insert_with(::core::default::Default::default);
                     {
                         mut_ref.decode_len_delimited(decoder)?;
                     };
-                    self._has.set_start();
                 }
                 2u32 => {
-                    let mut_ref = &mut self.r#end;
+                    let mut_ref = &mut *self
+                        .r#end
+                        .get_or_insert_with(::core::default::Default::default);
                     {
                         mut_ref.decode_len_delimited(decoder)?;
                     };
-                    self._has.set_end();
                 }
                 3u32 => {
-                    let mut_ref = &mut self.r#measurement;
+                    let mut_ref = &mut *self
+                        .r#measurement
+                        .get_or_insert_with(::core::default::Default::default);
                     {
                         mut_ref.decode_len_delimited(decoder)?;
                     };
-                    self._has.set_measurement();
                 }
                 _ => {
                     decoder.skip_wire_value(tag.wire_type())?;
@@ -1356,7 +1230,7 @@ impl ::micropb::MessageDecode for MeasurementEntry {
         Ok(())
     }
 }
-impl ::micropb::MessageEncode for MeasurementEntry {
+impl ::micropb::MessageEncode for MeasurementRange {
     const MAX_SIZE: ::core::option::Option<usize> = 'msg: {
         let mut max_size = 0;
         if let ::core::option::Option::Some(size) = ::micropb::const_map!(
@@ -1437,143 +1311,38 @@ impl ::micropb::MessageEncode for MeasurementEntry {
         size
     }
 }
-/// Inner types for `MeasurementEntry`
-pub mod MeasurementEntry_ {
-    /// Compact bitfield for tracking presence of optional and message fields
-    #[derive(Debug, Default, PartialEq, Clone)]
-    pub struct _Hazzer([u8; 1]);
-    impl _Hazzer {
-        /// New hazzer with all fields set to off
-        #[inline]
-        pub const fn _new() -> Self {
-            Self([0; 1])
-        }
-        /// Query presence of `start`
-        #[inline]
-        pub const fn r#start(&self) -> bool {
-            (self.0[0] & 1) != 0
-        }
-        /// Set presence of `start`
-        #[inline]
-        pub const fn set_start(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem |= 1;
-            self
-        }
-        /// Clear presence of `start`
-        #[inline]
-        pub const fn clear_start(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem &= !1;
-            self
-        }
-        /// Builder method that sets the presence of `start`. Useful for initializing the Hazzer.
-        #[inline]
-        pub const fn init_start(mut self) -> Self {
-            self.set_start();
-            self
-        }
-        /// Query presence of `end`
-        #[inline]
-        pub const fn r#end(&self) -> bool {
-            (self.0[0] & 2) != 0
-        }
-        /// Set presence of `end`
-        #[inline]
-        pub const fn set_end(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem |= 2;
-            self
-        }
-        /// Clear presence of `end`
-        #[inline]
-        pub const fn clear_end(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem &= !2;
-            self
-        }
-        /// Builder method that sets the presence of `end`. Useful for initializing the Hazzer.
-        #[inline]
-        pub const fn init_end(mut self) -> Self {
-            self.set_end();
-            self
-        }
-        /// Query presence of `measurement`
-        #[inline]
-        pub const fn r#measurement(&self) -> bool {
-            (self.0[0] & 4) != 0
-        }
-        /// Set presence of `measurement`
-        #[inline]
-        pub const fn set_measurement(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem |= 4;
-            self
-        }
-        /// Clear presence of `measurement`
-        #[inline]
-        pub const fn clear_measurement(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem &= !4;
-            self
-        }
-        /// Builder method that sets the presence of `measurement`. Useful for initializing the Hazzer.
-        #[inline]
-        pub const fn init_measurement(mut self) -> Self {
-            self.set_measurement();
-            self
-        }
-    }
-}
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct WateringEntry {
-    /// *Note:* The presence of this field is tracked separately in the `_has` field. It's recommended to access this field via the accessor rather than directly.
-    pub r#occurred_at: Timestamp,
+    pub r#occurred_at: ::core::option::Option<Timestamp>,
     pub r#duration_msec: u32,
-    /// Tracks presence of optional and message fields
-    pub _has: WateringEntry_::_Hazzer,
-}
-impl ::core::cmp::PartialEq for WateringEntry {
-    fn eq(&self, other: &Self) -> bool {
-        let mut ret = true;
-        ret &= (self.r#occurred_at() == other.r#occurred_at());
-        ret &= (self.r#duration_msec == other.r#duration_msec);
-        ret
-    }
 }
 impl WateringEntry {
     /// Return a reference to `occurred_at` as an `Option`
     #[inline]
     pub fn r#occurred_at(&self) -> ::core::option::Option<&Timestamp> {
-        self._has.r#occurred_at().then_some(&self.r#occurred_at)
+        self.r#occurred_at.as_ref()
     }
     /// Set the value and presence of `occurred_at`
     #[inline]
     pub fn set_occurred_at(&mut self, value: Timestamp) -> &mut Self {
-        self._has.set_occurred_at();
-        self.r#occurred_at = value.into();
+        self.r#occurred_at = ::core::option::Option::Some(value.into());
         self
     }
     /// Return a mutable reference to `occurred_at` as an `Option`
     #[inline]
     pub fn mut_occurred_at(&mut self) -> ::core::option::Option<&mut Timestamp> {
-        self._has.r#occurred_at().then_some(&mut self.r#occurred_at)
+        self.r#occurred_at.as_mut()
     }
     /// Clear the presence of `occurred_at`
     #[inline]
     pub fn clear_occurred_at(&mut self) -> &mut Self {
-        self._has.clear_occurred_at();
+        self.r#occurred_at = ::core::option::Option::None;
         self
     }
     /// Take the value of `occurred_at` and clear its presence
     #[inline]
     pub fn take_occurred_at(&mut self) -> ::core::option::Option<Timestamp> {
-        let val = self
-            ._has
-            .r#occurred_at()
-            .then(|| ::core::mem::take(&mut self.r#occurred_at));
-        self._has.clear_occurred_at();
-        val
+        self.r#occurred_at.take()
     }
     /// Builder method that sets the value of `occurred_at`. Useful for initializing the message.
     #[inline]
@@ -1617,11 +1386,12 @@ impl ::micropb::MessageDecode for WateringEntry {
             match tag.field_num() {
                 0 => return Err(::micropb::DecodeError::ZeroField),
                 1u32 => {
-                    let mut_ref = &mut self.r#occurred_at;
+                    let mut_ref = &mut *self
+                        .r#occurred_at
+                        .get_or_insert_with(::core::default::Default::default);
                     {
                         mut_ref.decode_len_delimited(decoder)?;
                     };
-                    self._has.set_occurred_at();
                 }
                 2u32 => {
                     let mut_ref = &mut self.r#duration_msec;
@@ -1700,44 +1470,6 @@ impl ::micropb::MessageEncode for WateringEntry {
         size
     }
 }
-/// Inner types for `WateringEntry`
-pub mod WateringEntry_ {
-    /// Compact bitfield for tracking presence of optional and message fields
-    #[derive(Debug, Default, PartialEq, Clone)]
-    pub struct _Hazzer([u8; 1]);
-    impl _Hazzer {
-        /// New hazzer with all fields set to off
-        #[inline]
-        pub const fn _new() -> Self {
-            Self([0; 1])
-        }
-        /// Query presence of `occurred_at`
-        #[inline]
-        pub const fn r#occurred_at(&self) -> bool {
-            (self.0[0] & 1) != 0
-        }
-        /// Set presence of `occurred_at`
-        #[inline]
-        pub const fn set_occurred_at(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem |= 1;
-            self
-        }
-        /// Clear presence of `occurred_at`
-        #[inline]
-        pub const fn clear_occurred_at(&mut self) -> &mut Self {
-            let elem = &mut self.0[0];
-            *elem &= !1;
-            self
-        }
-        /// Builder method that sets the presence of `occurred_at`. Useful for initializing the Hazzer.
-        #[inline]
-        pub const fn init_occurred_at(mut self) -> Self {
-            self.set_occurred_at();
-            self
-        }
-    }
-}
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Event {
     pub r#event: ::core::option::Option<Event_::Event>,
@@ -1799,7 +1531,7 @@ impl ::micropb::MessageEncode for Event {
         if let ::core::option::Option::Some(size) = 'oneof: {
             let mut max_size = 0;
             if let ::core::option::Option::Some(size) = ::micropb::const_map!(
-                ::micropb::const_map!(< MeasurementEntry as ::micropb::MessageEncode >
+                ::micropb::const_map!(< MeasurementRange as ::micropb::MessageEncode >
                 ::MAX_SIZE, | size | ::micropb::size::sizeof_len_record(size)), | size |
                 size + 1usize
             ) {
@@ -1875,7 +1607,7 @@ impl ::micropb::MessageEncode for Event {
 pub mod Event_ {
     #[derive(Debug, PartialEq, Clone)]
     pub enum Event {
-        Measurement(super::MeasurementEntry),
+        Measurement(super::MeasurementRange),
         Watering(super::WateringEntry),
     }
 }

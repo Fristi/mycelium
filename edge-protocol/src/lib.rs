@@ -1,5 +1,9 @@
 #![cfg_attr(not(test), no_std)]
 
+use timeseries::Deviate;
+
+use crate::v2_proto::Measurement;
+
 #[allow(
     non_camel_case_types,
     non_snake_case,
@@ -13,33 +17,6 @@ pub mod wire;
 
 #[cfg(feature = "gatt")]
 pub mod gatt;
-
-use chrono::NaiveDateTime;
-use timeseries::Deviate;
-
-#[derive(Debug, Clone, Copy)]
-pub struct SerieEntry<T> {
-    pub timestamp: NaiveDateTime,
-    pub value: T,
-}
-
-pub type MeasurementSerieEntry = SerieEntry<Measurement>;
-
-#[derive(Debug, Clone, Copy)]
-pub struct Watering {
-    pub duration_msec: u32,
-}
-
-pub type WateringSerieEntry = SerieEntry<Watering>;
-
-#[derive(Clone, Copy, Debug)]
-pub struct Measurement {
-    pub battery: u8,
-    pub lux: f32,
-    pub temperature: f32,
-    pub humidity: f32,
-    pub soil_pf: f32,
-}
 
 impl Deviate for Measurement {
     fn deviate(&self, other: &Self, max_deviation: &Self) -> bool {
