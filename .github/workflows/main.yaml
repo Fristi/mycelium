@@ -38,7 +38,7 @@ jobs:
           imageTag: "dev-${{ github.sha }}"
           EOF
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8.1.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "Update backend image tag to dev-${{ github.sha }}"
