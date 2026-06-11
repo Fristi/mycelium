@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { PlantProfile } from "../backend-client/api";
+import { PlantProfile } from "@backendclient/api";
 import { useParams } from "react-router";
 import { createRetriever } from "../api";
 import { useAuth } from "../AuthContext";

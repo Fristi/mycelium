@@ -46,3 +46,13 @@ execute-remote cfg host cmd:
 
 transfer-file cfg host from to:
     scp -F {{ cfg }} {{ from }} {{ host }}:{{ to }}
+
+gen-client lang name:
+    dagger -c "create-client {{lang}} {{name}} | export clients/{{name}}"
+
+gen-client-rs:
+    just gen-client rust rs
+
+gen-client-ts-axios:
+    just gen-client typescript-axios ts-axios
+

@@ -1,5 +1,5 @@
 import { Leaf } from "lucide-react";
-import { PlantProfileVariables } from "../backend-client/api";
+import { PlantProfileVariables } from "@backendclient/api";
 
 export interface PlantProfileVariablesDisplayProps {
   variables: PlantProfileVariables;

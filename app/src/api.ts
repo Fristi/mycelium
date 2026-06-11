@@ -1,14 +1,16 @@
-import { Configuration, DefaultApi } from "./backend-client/index";
-
-export type {
+import { Configuration, DefaultApi } from "@backendclient/index";
+import type {
   PlantProfile,
   PlantProfileVariables,
   Station,
   StationDetails,
   StationLog,
   StationMeasurement,
+  StationPlantProfile,
   StationUpdate,
-} from "./backend-client/api";
+} from "@backendclient/api";
+
+export type { PlantProfile, PlantProfileVariables, Station, StationDetails, StationLog, StationMeasurement, StationUpdate };
 
 export type WateringScheduleInterval = {
   _type: "Interval";
@@ -69,7 +71,7 @@ export function getStationLog(id: string) {
   return createRetriever((api) => api.getStationLog(id));
 }
 
-export function updateStation(id: string, update: import("./backend-client/api").StationUpdate) {
+export function updateStation(id: string, update: StationUpdate) {
   return createRetriever((api) => api.updateStation(id, update));
 }
 
@@ -77,6 +79,6 @@ export function getStationProfile(stationId: string) {
   return (token: string) =>
     createRetriever((api) => api.getProfiles())(token).then((response) => ({
       ...response,
-      data: response.data.find((profile) => profile.stationId === stationId)?.profile,
+      data: response.data.find((profile: StationPlantProfile) => profile.stationId === stationId)?.profile,
     }));
 }

@@ -1,4 +1,4 @@
-import { PlantProfile } from "../backend-client/api";
+import { PlantProfile } from "@backendclient/api";
 import { PlantProfileVariablesDisplay } from "./PlantProfileVariables";
 
 export interface PlantProfileDisplayProps {
