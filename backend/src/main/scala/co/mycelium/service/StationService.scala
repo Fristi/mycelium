@@ -17,14 +17,12 @@ trait StationService[F[_]] {
   def list(userId: String): F[List[Station]]
   def delete(userId: String, stationID: UUID): F[Unit]
   def update(userId: String, stationID: UUID, update: StationUpdate): F[Unit]
-  def checkin(userId: String, stationID: UUID, measurements: List[StationMeasurement]): F[Watering]
+  def checkin(userId: String, stationID: UUID, events: List[CheckinEvent]): F[Int]
   def details(
       userId: String,
       period: Option[MeasurementPeriod],
       stationID: UUID
   ): F[Either[Unit, StationDetails]]
-  def watered(userId: String, stationID: UUID, watering: Watering): F[Unit]
-  def getLogs(userId: String, stationID: UUID, page: Option[Long]): F[List[StationLog]]
   def uploadAvatar(
       userId: String,
       stationID: UUID,
@@ -48,13 +46,15 @@ final class StationServiceImpl[F[_]: {Concurrent}](
   override def checkin(
       userId: String,
       stationID: UUID,
-      measurements: List[StationMeasurement]
-  ): F[Watering] =
-    repos.stations.findById(stationID, userId).flatMap {
-      case Some(station) =>
-        repos.measurements.insertMany(stationID, measurements).as(Watering(None))
-      case None =>
-        Monad[F].pure(Watering(None))
+      events: List[CheckinEvent]
+  ): F[Int] =
+    protect(userId, stationID) {
+      val measurements = events.collect { case m: CheckinEvent.Measurement => m }
+      val waterings    = events.collect { case w: CheckinEvent.Watering    => w }
+      for {
+        measurementCount <- repos.measurements.insertMany(stationID, measurements)
+        wateringCount    <- repos.waterings.insertMany(stationID, waterings)
+      } yield measurementCount + wateringCount
     }
 
   override def add(userId: String, insert: StationInsert): F[UUID] =
@@ -90,19 +90,6 @@ final class StationServiceImpl[F[_]: {Concurrent}](
       case None =>
         Monad[F].pure(Left(()))
     }
-
-  override def watered(userId: String, stationID: UUID, watering: Watering): F[Unit] =
-    for {
-      now <- clock.realTimeInstant
-      _   <- watering.watering match {
-        case Some(value) =>
-          repos.stationLog.insert(StationLog(stationID, now, StationEvent.Watered(value))).void
-        case None => Monad[F].pure(())
-      }
-    } yield ()
-
-  override def getLogs(userId: String, stationID: UUID, page: Option[Long]): F[List[StationLog]] =
-    repos.stationLog.listByStation(stationID, page.getOrElse(0L))
 
   private def mkUrl(uuid: UUID) =
     Url("s3", Authority.unsafe("mycelium"), blobstore.url.Path(s"$uuid"))

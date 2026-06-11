@@ -9,12 +9,11 @@ import java.time.Instant
 
 final case class StationMeasurement(
     on: Instant,
-    batteryVoltage: Double,
+    battery: Int,
     temperature: Double,
     humidity: Double,
     lux: Double,
-    soilPf: Double,
-    tankPf: Double
+    soilPf: Double
 ) derives Encoder.AsObject,
       Decoder,
       Eq
