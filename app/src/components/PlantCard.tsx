@@ -1,4 +1,4 @@
-import { Station } from "../api";
+import { Station, avatarUrl } from "../api";
 import PlantLocation from "./PlantLocation";
 
 type Props = {
@@ -7,12 +7,11 @@ type Props = {
 
 export default (props: Props) => {
   const station = props.station;
-  const host = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
   return (
     <div className="flex flex-col items-start justify-between">
       <div className="relative w-full">
-        <img src={`${host}/avatar/${station.id}`} alt={station.description} className="aspect-[16/9] w-full rounded-2xl bg-gray-100 object-cover sm:aspect-[2/1] lg:aspect-[3/2]" />
+        <img src={avatarUrl(station.id)} alt={station.description ?? station.name} className="aspect-[16/9] w-full rounded-2xl bg-gray-100 object-cover sm:aspect-[2/1] lg:aspect-[3/2]" />
         <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-gray-900/10" />
       </div>
       <div className="max-w-xl">
@@ -23,7 +22,7 @@ export default (props: Props) => {
               {station.name}
             </a>
           </h3>
-          <PlantLocation location={station.location} />
+          <PlantLocation location={station.location ?? ""} />
         </div>
       </div>
     </div>

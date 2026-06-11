@@ -20,12 +20,16 @@ export const PlantEdit = () => {
   const auth = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data } = useQuery([`plants/${plantId}/details`], () => getStationDetails(plantId ?? "")(auth.token ?? ""));
+  const { data } = useQuery([`plants/${plantId}/details`], () => getStationDetails(plantId ?? "")(auth.token ?? "").then((response) => response.data));
 
   const BasicSettings = () => {
     const form = useFormik({
       enableReinitialize: true,
-      initialValues: data?.station ?? { name: "", location: "", description: "" },
+      initialValues: {
+        name: data?.station.name ?? "",
+        location: data?.station.location ?? "",
+        description: data?.station.description ?? "",
+      },
       validationSchema: toFormikValidationSchema(AttributeSchema),
       onSubmit: (values: AttributeUpdate) => {
         queryClient.invalidateQueries("plants");

@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Leaf } from "lucide-react";
 import Retrieve from "../Retrieve";
 import { getStations } from "../api";
 import PlantCard from "../components/PlantCard";
@@ -7,10 +8,17 @@ import { Station } from "../api";
 export const PlantList = () => {
   const renderData = (stations: Station[]) => {
     return (
-      <div className="mx-auto mt-8 grid max-w-2xl grid-cols-1 gap-x-8 gap-y-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
-        {stations.map((s) => (
-          <PlantCard key={s.id} station={s} />
-        ))}
+      <div>
+        <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+          <Leaf className="h-5 w-5" />
+          <p className="text-base/8 font-semibold">Your lushies..!</p>
+        </div>
+
+        <div className="mx-auto mt-8 grid max-w-2xl grid-cols-1 gap-x-8 gap-y-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+          {stations.map((s) => (
+            <PlantCard key={s.id} station={s} />
+          ))}
+        </div>
       </div>
     );
   };

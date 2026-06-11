@@ -1,4 +1,14 @@
-import axios from "axios";
+import { Configuration, DefaultApi } from "./backend-client/index";
+
+export type {
+  PlantProfile,
+  PlantProfileVariables,
+  Station,
+  StationDetails,
+  StationLog,
+  StationMeasurement,
+  StationUpdate,
+} from "./backend-client/api";
 
 export type WateringScheduleInterval = {
   _type: "Interval";
@@ -14,60 +24,59 @@ export type WateringScheduleThreshold = {
 
 export type WateringSchedule = WateringScheduleInterval | WateringScheduleThreshold;
 
-export type StationEventScheduleChanged = {
-  _type: "ScheduleChanged";
-  schedule: WateringSchedule;
-};
-export type StationEventWatered = { _type: "Watered"; period: string };
+function resolveApiBaseUrl(): string {
+  // const configured = import.meta.env.VITE_API_BASE_URL;
+  // if (configured) {
+  //   const trimmed = configured.replace(/\/$/, "");
+  //   return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
+  // }
 
-export type StationEvent = StationEventScheduleChanged | StationEventWatered;
+  // if (import.meta.env.MODE === "production") {
+  //   return "https://mycelium.markdejong.org/api";
+  // }
 
-export type StationLog = { on: string; event: StationEvent };
+  // return "http://localhost:8080/api";
 
-export type Station = {
-  id: string;
-  name: string;
-  description: string;
-  location: string;
-  wateringSchedule: WateringSchedule;
-};
-
-export type StationMeasurement = {
-  on: string;
-  batteryVoltage: number;
-  temperature: number;
-  humidity: number;
-  lux: number;
-  soilPf: number;
-  tankPf: number;
-};
-
-export type StationDetails = {
-  station: Station;
-  measurements: StationMeasurement[];
-};
-
-export type StationUpdate = {
-  name?: string;
-  description?: string;
-  location?: string;
-  wateringSchedule?: WateringSchedule;
-};
-
-const host = "https://mycelium.markdejong.org";
-
-export function getStations(): (token: string) => Promise<Station[]> {
-  return (token) => axios.get(`${host}/api/stations`, { headers: { Authorization: `Bearer ${token}` } }).then((x) => x.data);
+  return "https://mycelium.markdejong.org/api"
 }
 
-export function getStationDetails(id: string): (token: string) => Promise<StationDetails> {
-  return (token) => axios.get(`${host}/api/stations/${id}`, { headers: { Authorization: `Bearer ${token}` } }).then((x) => x.data);
+export const apiBaseUrl = resolveApiBaseUrl();
+
+export function avatarUrl(stationId: string): string {
+  return `${apiBaseUrl}/stations/${stationId}/avatar`;
 }
 
-export function getStationLog(id: string): (token: string) => Promise<StationLog[]> {
-  return (token) => axios.get(`${host}/api/stations/${id}/log`, { headers: { Authorization: `Bearer ${token}` } }).then((x) => x.data);
+export function createRetriever<T>(f: (api: DefaultApi) => T): (jwt: string) => T {
+  return (jwt) => {
+    const config = new Configuration({
+      basePath: apiBaseUrl,
+      accessToken: () => jwt,
+    });
+    const api = new DefaultApi(config);
+    return f(api);
+  };
 }
 
-export function updateStation(id: string, update: StationUpdate): (token: string) => Promise<void> {
-  return (token) => axios.put(`${host}/api/stations/${id}`, JSON.stringify(update), { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }).then((x) => x.data);
+export function getStations() {
+  return createRetriever((api) => api.listStations());
+}
+
+export function getStationDetails(id: string) {
+  return createRetriever((api) => api.getStation(id));
+}
+
+export function getStationLog(id: string) {
+  return createRetriever((api) => api.getStationLog(id));
+}
+
+export function updateStation(id: string, update: import("./backend-client/api").StationUpdate) {
+  return createRetriever((api) => api.updateStation(id, update));
+}
+
+export function getStationProfile(stationId: string) {
+  return (token: string) =>
+    createRetriever((api) => api.getProfiles())(token).then((response) => ({
+      ...response,
+      data: response.data.find((profile) => profile.stationId === stationId)?.profile,
+    }));
 }
