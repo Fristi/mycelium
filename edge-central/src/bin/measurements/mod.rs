@@ -7,6 +7,7 @@ use crate::measurements::types::PeripheralSyncResultStreamProvider;
 use crate::ports::plant_profiles::PlantProfilePort;
 
 pub mod btleplug;
+pub mod checkin;
 pub mod random;
 pub mod types;
 

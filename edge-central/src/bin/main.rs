@@ -10,13 +10,17 @@ use aliri_reqwest::AccessTokenMiddleware;
 use aliri_tokens::{backoff, jitter, sources::{self, oauth2::dto::RefreshTokenCredentialsSource}, ClientId, RefreshToken, TokenLifetimeConfig, TokenWatcher};
 use anyhow::*;
 use dotenv::dotenv;
-use edge_client_backend::{apis::configuration::Configuration, models::StationInsert};
+use edge_client_backend::{
+    apis::{configuration::Configuration, default_api},
+    models::StationInsert,
+};
 use futures::{stream, StreamExt};
 use reqwest::{Client, Request, Url};
 use reqwest_middleware::ClientBuilder;
 use reqwest_tracing::TracingMiddleware;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool};
 use std::{str::FromStr, sync::Arc, time::Duration};
+use crate::measurements::checkin::events_to_checkin;
 use crate::measurements::types::PeripheralSyncResult;
 use crate::data::sqlite::SqliteEdgeStateRepository;
 use crate::cfg::AppConfig;
@@ -135,9 +139,21 @@ async fn sync_measurements(configuration: &Configuration, m: PeripheralSyncResul
 
     let station_insert = StationInsert::new(mac, "Unnamed".to_string());
 
-    let id = edge_client_backend::apis::default_api::add_station(&configuration, station_insert).await?;
+    let station_id = default_api::add_station(configuration, station_insert).await?;
+    let checkin_events = events_to_checkin(&m.events)?;
+    if checkin_events.is_empty() {
+        return Ok(());
+    }
 
-    Ok(())            
+    let inserted = default_api::checkin_station(
+        configuration,
+        &station_id.to_string(),
+        Some(checkin_events),
+    )
+    .await?;
+    tracing::info!(%station_id, inserted, "checkin complete");
+
+    Ok(())
 }
 
 #[derive(Debug, Clone)]
