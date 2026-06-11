@@ -9,6 +9,7 @@ import { PlantView } from "./pages/PlantView.tsx";
 import { PlantList } from "./pages/PlantList.tsx";
 import { PlantEdit } from "./pages/PlantEdit.tsx";
 import { HubAdd, HubProvisioning } from "./pages/HubAdd.tsx";
+import PlantAvatarUpload from "./pages/PlantAvatarUpload.tsx";
 
 const callbackUri = "http://localhost:1420";
 const cacheLocation = "localstorage";
@@ -25,6 +26,7 @@ const router = createHashRouter(
         <Route path="hub-add" element={<HubAdd />} />
         <Route path="hub-add/:deviceId" element={<HubProvisioning />} />
         <Route path="plants/:plantId/edit" element={<PlantEdit />} />
+        <Route path="plants/:plantId/avatar" element={<PlantAvatarUpload />} />
         <Route path="plants/:plantId" element={<PlantView />} />
       </Route>
     </Route>,

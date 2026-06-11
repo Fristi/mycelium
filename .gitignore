@@ -22,7 +22,7 @@ pnpm-debug.log*
 **/.env
 
 # Generated
-edge-client-backend
+clients
 
 # Scala
 **/.bloop

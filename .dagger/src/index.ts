@@ -63,67 +63,6 @@ export class MyceliumBuild {
       .withWorkdir("/workspace");
   }
 
-  /**
-   * Build the Scala backend
-   */
-  async buildBackend_(backendJar: File, arch: string): Promise<Container> {
-    const src = this.source;
-    const backendNative = dag
-      .container({ platform: arch as any })
-      .from("ghcr.io/graalvm/native-image-community:25-muslib")
-      .withWorkdir("/workspace")
-      .withFile("/workspace/backend.jar", backendJar)
-      .withFile("/workspace/reflection-config.json", src.file("backend/reflection-config.json"))
-      .withExec([
-        "native-image",
-        "--no-fallback",
-        "--static",
-        "--libc=musl",
-        "--install-exit-handlers",
-        "--initialize-at-build-time",
-        "--report-unsupported-elements-at-runtime",
-        "-H:IncludeResources=META-INF/services/.*,placeholder\\.png,logback\\.xml",
-        "-H:ReflectionConfigurationFiles=reflection-config.json",
-        "--enable-url-protocols=http,https",
-        "--add-opens=java.base/java.nio=ALL-UNNAMED",
-        "--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED",
-        "--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED",
-        "--trace-class-initialization=ch.qos.logback.classic.Logger",
-        "--trace-object-instantiation=ch.qos.logback.core.AsyncAppenderBase$Worker,java.util.Random",
-        "--initialize-at-run-time=org.postgresql,org.postgresql.Driver,org.postgresql.jdbc",
-        "-cp",
-        "/workspace/backend.jar",
-        "co.mycelium.Main",
-        "/workspace/backend"
-      ])
-      .withExec(["chmod", "+x", "/workspace/backend"]);
-
-    return dag
-      .container({ platform: arch as any })
-      .from("gcr.io/distroless/cc")
-      .withWorkdir("/app")
-      .withExposedPort(8080)
-      .withFile("/app/backend", backendNative.file("/workspace/backend"))
-      .withEntrypoint(["/app/backend"])
-      .sync();
-  }
-
-  @func()
-  async publishBackendGraal(password: Secret, tag?: string): Promise<string> {
-      // const platforms = ["linux/amd64", "linux/arm64"];
-      const platforms = ["linux/arm64"];
-      const backendJar = await this.containerBackend()
-        .withExec(["sbt", "assembly"])
-        .file("target/scala-3.7.4/backend-assembly-1.0.jar");
-
-      const containers = await Promise.all(platforms.map(x => this.buildBackend_(backendJar, x)));
-
-      return dag
-        .container()
-        .withRegistryAuth("docker.io", "markdj", password)
-        .publish(`markdj/mycelium-backend:${tag ?? "latest"}`, { platformVariants: containers });
-  }
-
   @func()
   publishBackend(password: Secret, tag?: string): Promise<string> {
     return this
@@ -214,6 +153,7 @@ export class MyceliumBuild {
    */
   containerCentral(arch: string): Container {
     const src = this.source;
+    const rustClient = this.createClient("rust", "edge-client-backend");
 
     return dag
     .container({ platform: arch as any })
@@ -224,7 +164,7 @@ export class MyceliumBuild {
       .withMountedCache("/usr/local/cargo/registry", dag.cacheVolume("edge-central-cargo-registry"))
       .withMountedCache("/usr/local/cargo/git", dag.cacheVolume("edge-central-cargo-git"))
       .withDirectory("/workspace/edge-central", src.directory("edge-central").filter({include: [".cargo/config.toml", "src/**", "migrations/**", "Cargo.toml", "Cargo.lock"]}))
-      .withDirectory("/workspace/edge-client-backend", src.directory("edge-client-backend").filter({include: ["src/**", "Cargo.toml", "Cargo.lock"]}))
+      .withDirectory("/workspace/clients/rs", rustClient)
       .withDirectory("/workspace/edge-onboarding-ble", src.directory("edge-onboarding-ble").filter({include: ["src/**", "build.rs", "onboarding.proto", "Cargo.toml", "Cargo.lock"]}))
       .withDirectory("/workspace/edge-protocol", src.directory("edge-protocol").filter({include: ["src/**", "Cargo.toml", "Cargo.lock"]}))
       .withMountedCache("/workspace/edge-protocol/target", dag.cacheVolume("edge-protocol-target"))
@@ -302,7 +242,6 @@ export class MyceliumBuild {
   async ci(@argument() arch: string = "linux/amd64") {
 
     await Promise.all([
-      this.buildPeripheral(arch),
       this.testCentral(arch),
       this.buildBackend()
     ]);

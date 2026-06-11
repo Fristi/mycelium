@@ -6,7 +6,7 @@ version = "0.1.0"
 [dependencies]
 edge-protocol = { path = "../edge-protocol" }
 edge-onboarding-ble = { path = "../edge-onboarding-ble" }
-edge-client-backend = { path = "../edge-client-backend" }
+edge-client-backend = { path = "../clients/rs" }
 tokio = { version = "1", features = ["full"] }
 backon = "1.6.0"
 rand = { version = "0.8.5", features = ["getrandom"] }
