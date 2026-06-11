@@ -19,18 +19,16 @@ object StationProfileRepository {
   implicit val functorK: FunctorK[StationProfileRepository] = Derive.functorK
 }
 
-trait StationLogRepository[F[_]] {
-  def insert(log: StationLog): F[Int]
-  def listByStation(id: UUID, offset: Long): F[List[StationLog]]
-  def lastTimeWatered(id: UUID): F[Option[Instant]]
+trait StationWateringRepository[F[_]] {
+  def insertMany(stationId: UUID, waterings: List[CheckinEvent.Watering]): F[Int]
 }
 
-object StationLogRepository {
-  implicit val functorK: FunctorK[StationLogRepository] = Derive.functorK
+object StationWateringRepository {
+  implicit val functorK: FunctorK[StationWateringRepository] = Derive.functorK
 }
 
 trait StationMeasurementRepository[F[_]] {
-  def insertMany(stationId: UUID, measurements: List[StationMeasurement]): F[Int]
+  def insertMany(stationId: UUID, measurements: List[CheckinEvent.Measurement]): F[Int]
 
   def avg(stationId: UUID, period: MeasurementPeriod): F[List[StationMeasurement]]
 }
@@ -52,7 +50,7 @@ object StationRepository {
 }
 
 trait Repositories[F[_]] {
-  def stationLog: StationLogRepository[F]
+  def waterings: StationWateringRepository[F]
   def stationProfile: StationProfileRepository[F]
   def stations: StationRepository[F]
   def measurements: StationMeasurementRepository[F]

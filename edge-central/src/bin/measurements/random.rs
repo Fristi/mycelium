@@ -1,7 +1,7 @@
 use std::{pin::Pin, time::Duration};
 
-use chrono::{TimeDelta, Utc};
-use edge_protocol::{Measurement, MeasurementSerieEntry};
+use chrono::TimeDelta;
+use edge_protocol::v2_proto::Events;
 use futures::{stream, Stream};
 use tokio::time::sleep;
 
@@ -23,22 +23,11 @@ impl PeripheralSyncResultStreamProvider for RandomPeripheralSyncResultStreamProv
         let delay = Duration::from_millis(self.delay.num_milliseconds() as u64);
         let mac = self.mac;
         let stream = stream::unfold((delay, mac), |(delay, mac)| async move {
-            let mut measurements = vec![];
-
-            for _ in 0..6 {
-                let measurement = random_measurement();
-                let serie_entry = MeasurementSerieEntry {
-                    timestamp: Utc::now().naive_utc(),
-                    measurement,
-                };
-
-                measurements.push(serie_entry);
-            }
 
             let result = PeripheralSyncResult {
                 address: mac,
                 time_drift: TimeDelta::zero(),
-                measurements,
+                events: Events::default(),
             };
 
             sleep(delay).await;
@@ -47,15 +36,5 @@ impl PeripheralSyncResultStreamProvider for RandomPeripheralSyncResultStreamProv
         });
 
         Box::pin(stream)
-    }
-}
-
-fn random_measurement() -> Measurement {
-    Measurement {
-        battery: (rand::random::<u8>() % 101) as u8,
-        lux: (rand::random::<u32>() % 100001) as f32,
-        temperature: (rand::random::<u32>() % 46) as f32,
-        humidity: (rand::random::<u32>() % 101) as f32,
-        soil_pf: (rand::random::<u32>() % 450) as f32,
     }
 }

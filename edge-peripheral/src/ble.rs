@@ -3,30 +3,28 @@ use embassy_futures::select::select;
 use trouble_host::prelude::*;
 use trouble_host::types::gatt_traits::FromGatt;
 use trouble_host::BleHostError;
+#[expect(unused_imports, reason = "loads AsGatt/FromGatt impls for proto GATT types")]
 use edge_protocol::gatt as _;
 use edge_protocol::v2::*;
-use edge_protocol::v2::measurements_to_events;
-use edge_protocol::v2_proto::{Events, PlantProfile, SyncState, Timestamp};
+use edge_protocol::v2_proto::{Events, MacAddress, PlantProfileSetting, SyncState, Timestamp};
 use esp_hal::rtc_cntl::Rtc;
 use log::*;
 
-use crate::state::Measurements;
+use crate::state::DeviceStateData;
 use crate::utils::rtc::RtcExt;
 
 /// Max number of connections
 const CONNECTIONS_MAX: usize = 1;
 /// Max number of L2CAP channels.
 const L2CAP_CHANNELS_MAX: usize = 2; // Signal + att
-const L2CAP_MTU: usize = 512;
-
 #[gatt_service(uuid = STATION_SERVICE_UUID_16)]
 struct StationService {
     #[characteristic(uuid = STATION_MAC_ADDR_CHARACTERISTIC_UUID_16, read)]
-    address: [u8; 6],
+    address: MacAddress,
     #[characteristic(uuid = STATION_EVENTS_CHARACTERISTIC_UUID_16, read)]
     events: Events,
     #[characteristic(uuid = STATION_PLANT_PROFILE_CHARACTERISTIC_UUID_16, read, write)]
-    current_profile: PlantProfile,
+    current_profile: PlantProfileSetting,
     #[characteristic(uuid = STATION_CURRENT_TIME_CHARACTERISTIC_UUID_16, read, write)]
     current_time: Timestamp,
     #[characteristic(uuid = STATION_SYNC_STATE_CHARACTERISTIC_UUID_16, read, write)]
@@ -34,11 +32,11 @@ struct StationService {
 }
 
 impl StationService {
-    fn merge_into(&self, server: &Server<'_>, base: &StationState) -> Result<StationState, Error> {
-        Ok(StationState {
+    fn merge_into(&self, server: &Server<'_>, base: &GattSyncSession) -> Result<GattSyncSession, Error> {
+        Ok(GattSyncSession {
             mac: base.mac,
-            events: self.events.get(&server)?,
-            current_profile: self.current_profile.get(&server)?,
+            events: Events::default(), // self.events.get(&server)?,
+            current_profile: PlantProfileSetting::default(), // self.current_profile.get(&server)?,
             current_time: self.current_time.get(&server)?,
         })
     }
@@ -49,35 +47,41 @@ struct Server {
     station_service: StationService
 }
 
+/// BLE session snapshot: proto types exposed over GATT for one connection.
 #[derive(Debug)]
-pub struct StationState {
+pub struct GattSyncSession {
     pub mac: [u8; 6],
     pub events: Events,
-    pub current_profile: PlantProfile,
-    pub current_time: Timestamp
+    /// Written by central over GATT; retained for a future plant-profile consumer.
+    #[allow(dead_code)]
+    pub current_profile: PlantProfileSetting,
+    pub current_time: Timestamp,
 }
-impl StationState {
+
+impl GattSyncSession {
     pub fn init_with_mac(mac: [u8; 6]) -> Self {
         Self {
             mac,
             events: Events::default(),
-            current_profile: PlantProfile::default(),
+            current_profile: PlantProfileSetting { profile: None },
             current_time: Timestamp::default(),
         }
     }
 
-    pub fn from_measurements(mac: [u8; 6], measurements: &Measurements) -> Result<Self, ()> {
+    pub fn from_device_state_data(mac: [u8; 6], data: &DeviceStateData) -> Result<Self, ()> {
         Ok(Self {
             mac,
-            events: measurements_to_events(measurements)?,
-            current_profile: PlantProfile::default(),
+            events: data.to_events()?,
+            current_profile: PlantProfileSetting { profile: data.plant_profile.clone() },
             current_time: Timestamp::default(),
         })
     }
 
     fn to_service(&self, server: &Server<'_>) -> Result<(), Error> {
-        server.station_service.address.set(&server, &self.mac)?;
+        let address = mac_address_from_bytes(self.mac).map_err(|_| Error::InvalidValue)?;
+        server.station_service.address.set(&server, &address)?;
         server.station_service.events.set(&server, &self.events)?;
+        server.station_service.current_profile.set(&server, &self.current_profile)?;
         server
             .station_service
             .current_time
@@ -89,15 +93,13 @@ impl StationState {
 /// Run the BLE stack. Pass `Some(rtc)` during `AwaitingTimeSync` to apply central time writes.
 pub async fn run<C>(
     controller: C,
-    state: &StationState,
+    session: &GattSyncSession,
     rtc: Option<&Rtc<'_>>,
-) -> Result<StationState, Error>
+) -> Result<GattSyncSession, Error>
 where
     C: Controller
 {
-    // Using a fixed "random" address can be useful for testing. In real scenarios, one would
-    // use e.g. the MAC 6 byte array as the address (how to get that varies by the platform).
-    let address: Address = Address::random(state.mac);
+    let address: Address = Address::random(session.mac);
     info!("Our address = {:?}", address);
 
     let mut resources: HostResources<DefaultPacketPool, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> = HostResources::new();
@@ -113,10 +115,7 @@ where
     }))
     .unwrap();
 
-    state.to_service(&server).expect("Unable to set state");
-
-    // let mac_address = heapless::Vec::from_array(mac);
-    // server.station_service.address.set(&server, &MacAddress { mac_address });
+    session.to_service(&server).expect("Unable to set state");
 
     let res = select(ble_task(runner), async {
         let conn = advertise("Mycelium", &mut peripheral, &server)
@@ -125,8 +124,8 @@ where
                 BleHostError::BleHost(err) => err,
                 _ => Error::InvalidState,
             })?;
-        gatt_events_task(&server, &conn, state, rtc).await?;
-        server.station_service.merge_into(&server, state)
+        gatt_events_task(&server, &conn, session, rtc).await?;
+        server.station_service.merge_into(&server, session)
     })
     .await;
 
@@ -144,7 +143,6 @@ async fn ble_task<C: Controller, P: PacketPool>(mut runner: Runner<'_, C, P>) {
     }
 }
 
-/// Create an advertiser to use to connect to a BLE Central, and wait for it to connect.
 async fn advertise<'values, 'server, C: Controller>(
     name: &'values str,
     peripheral: &mut Peripheral<'values, C, DefaultPacketPool>,
@@ -152,7 +150,6 @@ async fn advertise<'values, 'server, C: Controller>(
 ) -> Result<GattConnection<'values, 'server, DefaultPacketPool>, BleHostError<C::Error>> {
     let service_uuid = STATION_SERVICE_UUID_16.to_le_bytes();
 
-    // Primary adv: flags + service UUID (required for service-filtered scans on many centrals).
     let mut adv_data = [0u8; 31];
     let adv_len = AdStructure::encode_slice(
         &[
@@ -162,7 +159,6 @@ async fn advertise<'values, 'server, C: Controller>(
         &mut adv_data[..],
     )?;
 
-    // Scan response: name + service UUID again for stacks that only inspect scan rsp.
     let mut scan_data = [0u8; 31];
     let scan_len = AdStructure::encode_slice(
         &[
@@ -190,11 +186,12 @@ async fn advertise<'values, 'server, C: Controller>(
 async fn gatt_events_task<P: PacketPool>(
     server: &Server<'_>,
     conn: &GattConnection<'_, '_, P>,
-    state: &StationState,
+    session: &GattSyncSession,
     rtc: Option<&Rtc<'_>>,
 ) -> Result<(), Error> {
-    server.station_service.address.set(server, &state.mac)?;
-    server.station_service.events.set(server, &state.events)?;
+    let address = mac_address_from_bytes(session.mac).map_err(|_| Error::InvalidValue)?;
+    server.station_service.address.set(server, &address)?;
+    server.station_service.events.set(server, &session.events)?;
 
     if rtc.is_some() {
         server
@@ -250,14 +247,13 @@ fn handle_gatt_write<P: PacketPool>(
         let ts: Timestamp = write
             .value(&server.station_service.current_time)
             .map_err(|_| Error::InvalidValue)?;
-        if ts.timestamp != 0 {
-            rtc.set_unix_timestamp(ts.timestamp);
-            server
-                .station_service
-                .sync_state
-                .set(server, &SyncState::Done)?;
-            info!("[gatt] RTC set to unix {}", ts.timestamp);
-        }
+
+        rtc.set_unix_timestamp(ts.timestamp);
+                server
+                    .station_service
+                    .sync_state
+                    .set(server, &SyncState::Done)?;
+
         return Ok(());
     }
 
@@ -269,4 +265,10 @@ fn handle_gatt_write<P: PacketPool>(
     }
 
     Ok(())
+}
+
+/// Build a wire `MacAddress` from six raw bytes (including zeros).
+fn mac_address_from_bytes(value: [u8; 6]) -> Result<MacAddress, ()> {
+    let mac_address = heapless::Vec::from_slice(&value).map_err(|_| ())?;
+    Ok(MacAddress { mac_address })
 }

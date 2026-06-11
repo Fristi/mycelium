@@ -1,4 +1,4 @@
-use crate::status::{OnboardingDisplay, Status, StatusSummary};
+use crate::status::{OnboardingDisplay, Status};
 use embedded_graphics::{
     mono_font::{
         MonoTextStyle, ascii::{FONT_5X7}
@@ -33,37 +33,6 @@ impl I2cStatus {
 }
 
 impl Status for I2cStatus {
-
-    fn show(&mut self, status: &StatusSummary) -> Result<()> {
-        let style = MonoTextStyle::new(&FONT_5X7, BinaryColor::On);
-
-        // --- First row: time range header ---
-        let from_str = status.from.format("%H:%M").to_string();
-        let till_str = status.till.format("%H:%M").to_string();
-        let header = format!("{} till {}", from_str, till_str);
-
-        Text::with_alignment(&header, Point::new(64, 8), style, Alignment::Center)
-            .draw(&mut self.display).map_err(|e| anyhow::anyhow!("Unable to draw: {:?}", e))?;
-
-        // --- Sensor rows ---
-        let lines = [
-            format!("T {:.0} C  | S {:.0} pF", status.temperature, status.soil_moisture),
-            format!("H {:.0} RH | L {:.0} lx", status.humidity, status.light)
-        ];
-
-        let mut y = 20;
-        for line in lines {
-            Text::new(&line, Point::new(0, y), style)
-                .draw(&mut self.display)
-                .map_err(|e| anyhow::anyhow!("Unable to draw: {:?}", e))?;
-
-            y += 10; // Line spacing
-        }
-
-        self.display.flush().map_err(|e| anyhow::anyhow!("Unable to flush display: {:?}", e))?;
-
-        Ok(())
-    }
 
     fn show_onboarding(&mut self, display: &OnboardingDisplay) -> Result<()> {
         let style = MonoTextStyle::new(&FONT_5X7, BinaryColor::On);

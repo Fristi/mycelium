@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 edge-protocol = { path = "../edge-protocol" }
+timeseries = { git = "https://github.com/Fristi/timeseries", rev = "869521bb62a99a101e8f0f7d60fadac2a2a046ba" }
 edge-onboarding-ble = { path = "../edge-onboarding-ble" }
 edge-client-backend = { path = "../clients/rs" }
 tokio = { version = "1", features = ["full"] }
@@ -29,6 +30,7 @@ predicates-core = "1.0.9"
 reqwest-tracing = "0.5.8"
 uuid = "1.18.1"
 btleplug = "0.11.8"
+heapless = "0.9.3"
 
 [target.'cfg(all(target_os = "linux", target_arch = "aarch64"))'.dependencies]
 # bluer + btleplug depend on D-Bus on Linux aarch64 (Orange Pi).

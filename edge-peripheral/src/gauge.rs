@@ -5,7 +5,7 @@ use embassy_time::{Delay, Timer};
 use embedded_hal_bus::i2c::RefCellDevice;
 use embedded_hal_compat::ReverseCompat;
 use esp_hal::{analog::adc::AdcChannel, gpio::Output, i2c::master::I2c, Blocking};
-use edge_protocol::Measurement;
+use edge_protocol::v2_proto::Measurement;
 
 use crate::battery::BatteryMeasurement;
 use crate::utils::anyhow::ResultAny;
@@ -72,7 +72,7 @@ impl <'a, P : AdcChannel> Gauge<'a, P> {
         self.pcb_pwr.set_low();
 
         let measurement = Measurement {
-            battery,
+            battery: battery as u32,
             lux,
             temperature: measurement.temperature.as_degrees_celsius(),
             humidity: measurement.humidity.as_percent(),

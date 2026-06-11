@@ -7,10 +7,10 @@ use btleplug::api::{Central, Manager as _, Peripheral as _, ScanFilter, WriteTyp
 use btleplug::platform::{Adapter, Manager, Peripheral};
 use chrono::{DateTime, Duration, Utc};
 use edge_protocol::v2::{
-    decode_mac_address, decode_proto, encode_proto, events_to_measurement_entries,
-    STATION_CURRENT_TIME_CHARACTERISTIC_UUID_16, STATION_EVENTS_CHARACTERISTIC_UUID_16,
-    STATION_MAC_ADDR_CHARACTERISTIC_UUID_16, STATION_PLANT_PROFILE_CHARACTERISTIC_UUID_16,
-    STATION_SERVICE_UUID_16,
+    decode_proto, encode_proto, parse_mac_address_bytes,
+    STATION_CURRENT_TIME_CHARACTERISTIC_UUID_16,
+    STATION_EVENTS_CHARACTERISTIC_UUID_16, STATION_MAC_ADDR_CHARACTERISTIC_UUID_16,
+    STATION_PLANT_PROFILE_CHARACTERISTIC_UUID_16, STATION_SERVICE_UUID_16,
 };
 use edge_protocol::v2_proto::{Events, Timestamp};
 use futures::Stream;
@@ -154,13 +154,8 @@ async fn sync(
         })?;
 
     let mac_addr_data = read_characteristic(&peripheral, mac_addr_char).await?;
-    let address = decode_mac_address(&mac_addr_data).map_err(|e| {
-        anyhow!(
-            "Failed to decode MacAddress from {} bytes {:02x?}: {e:?}",
-            mac_addr_data.len(),
-            mac_addr_data
-        )
-    })?;
+    let address = parse_mac_address_bytes(&mac_addr_data)
+        .map_err(|_| anyhow!("MacAddress characteristic did not contain 6 bytes"))?;
 
     info!(
         "Found device {:?} (station mac {:02x?})",
@@ -183,17 +178,12 @@ async fn sync(
     let events: Events = decode_proto(&events_data)
         .map_err(|e| anyhow!("Failed to decode Events protobuf: {e:?}"))?;
 
-    let measurements = events_to_measurement_entries::<32>(events)
-        .map_err(|_| anyhow!("Failed to convert events to measurements"))?
-        .into_iter()
-        .collect();
-
     peripheral.disconnect().await?;
 
     Ok(PeripheralSyncResult {
         address,
         time_drift,
-        measurements,
+        events,
     })
 }
 
@@ -273,3 +263,4 @@ async fn read_characteristic(
     }
     Ok(vec![])
 }
+

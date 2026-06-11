@@ -10,21 +10,23 @@ use aliri_reqwest::AccessTokenMiddleware;
 use aliri_tokens::{backoff, jitter, sources::{self, oauth2::dto::RefreshTokenCredentialsSource}, ClientId, RefreshToken, TokenLifetimeConfig, TokenWatcher};
 use anyhow::*;
 use dotenv::dotenv;
-use edge_client_backend::{apis::configuration::{Configuration}, models::{StationInsert, StationMeasurement}};
+use edge_client_backend::{
+    apis::{configuration::Configuration, default_api},
+    models::StationInsert,
+};
 use futures::{stream, StreamExt};
 use reqwest::{Client, Request, Url};
 use reqwest_middleware::ClientBuilder;
 use reqwest_tracing::TracingMiddleware;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool};
 use std::{str::FromStr, sync::Arc, time::Duration};
+use crate::measurements::checkin::events_to_checkin;
 use crate::measurements::types::PeripheralSyncResult;
 use crate::data::sqlite::SqliteEdgeStateRepository;
 use crate::cfg::AppConfig;
-use crate::status::StatusSummary;
 use crate::measurements::make_peripheral_sync_stream_provider;
 use crate::onboarding::make_onboarding;
 use crate::ports::plant_profiles::{CachedPlantProfilePort, run_profile_sync};
-use crate::status::make_status;
 
 #[tokio::main]
 async fn main() {
@@ -130,36 +132,28 @@ async fn work() -> anyhow::Result<()> {
 }
 
 async fn sync_measurements(configuration: &Configuration, m: PeripheralSyncResult) -> anyhow::Result<()> {
+    let mac = format!(
+        "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+        m.address[0], m.address[1], m.address[2], m.address[3], m.address[4], m.address[5]
+    );
 
-    let mac = format!("{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}", m.address[0], m.address[1], m.address[2], m.address[3], m.address[4], m.address[5]);
     let station_insert = StationInsert::new(mac, "Unnamed".to_string());
 
-    let id = edge_client_backend::apis::default_api::add_station(&configuration, station_insert).await?;
-    let mut measurements = vec![];
-    let summary = StatusSummary::from_measurements(&m.measurements);
-
-    for measurement in m.measurements {
-        measurements.push(StationMeasurement {
-            on: measurement.timestamp.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
-            battery_voltage: 0_f64,
-            temperature: measurement.measurement.temperature as f64,
-            humidity: measurement.measurement.humidity as f64,
-            lux: measurement.measurement.lux as f64,
-            soil_pf: measurement.measurement.soil_pf as f64,
-            tank_pf: 0_f64
-        });
+    let station_id = default_api::add_station(configuration, station_insert).await?;
+    let checkin_events = events_to_checkin(&m.events)?;
+    if checkin_events.is_empty() {
+        return Ok(());
     }
 
-    edge_client_backend::apis::default_api::checkin_station(&configuration, id.to_string().as_str(), Some(measurements)).await?;
-    match summary {
-        Some(m) => {
-            let mut status = make_status()?;
-            status.show(&m)?
-        },
-        None => ()
-    }
+    let inserted = default_api::checkin_station(
+        configuration,
+        &station_id.to_string(),
+        Some(checkin_events),
+    )
+    .await?;
+    tracing::info!(%station_id, inserted, "checkin complete");
 
-    Ok(())            
+    Ok(())
 }
 
 #[derive(Debug, Clone)]

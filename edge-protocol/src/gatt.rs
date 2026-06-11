@@ -89,5 +89,48 @@ impl FromGatt for SyncState {
     }
 }
 
-as_gatt!(PlantProfile, Timestamp, Events, MacAddress);
-from_gatt!(PlantProfile, Timestamp, Events, MacAddress);
+static GATT_BUFFER_MAC: SyncUnsafeCell<[u8; 6]> = SyncUnsafeCell(UnsafeCell::new([0; 6]));
+
+/// MAC addresses are always six raw octets on the wire so leading/trailing `0x00` bytes are preserved.
+impl AsGatt for MacAddress {
+    const MIN_SIZE: usize = 6;
+    const MAX_SIZE: usize = 6;
+
+    fn as_gatt(&self) -> &'static [u8] {
+        let buffer: &mut [u8; 6] = unsafe { &mut *GATT_BUFFER_MAC.0.get() };
+        buffer.fill(0);
+        let src = self.r#mac_address.as_slice();
+        let len = src.len().min(6);
+        buffer[..len].copy_from_slice(&src[..len]);
+        unsafe { core::slice::from_raw_parts(buffer.as_ptr(), 6) }
+    }
+}
+
+impl FromGatt for MacAddress {
+    fn from_gatt(data: &[u8]) -> Result<Self, FromGattError> {
+        if data.len() == 6 {
+            let mut mac_address = ::micropb::heapless::Vec::<u8, 6>::new();
+            mac_address
+                .extend_from_slice(data)
+                .map_err(|_| FromGattError::InvalidLength)?;
+            return Ok(MacAddress { mac_address });
+        }
+
+        if data.is_empty() {
+            return Err(FromGattError::InvalidLength);
+        }
+
+        let mut message = Self::default();
+        let mut decoder = PbDecoder::new(data);
+        message
+            .decode(&mut decoder, data.len())
+            .map_err(|_| FromGattError::InvalidLength)?;
+        if message.r#mac_address.len() != 6 {
+            return Err(FromGattError::InvalidLength);
+        }
+        Ok(message)
+    }
+}
+
+as_gatt!(PlantProfile, Timestamp, Events, PlantProfileSetting);
+from_gatt!(PlantProfile, Timestamp, Events, PlantProfileSetting);
