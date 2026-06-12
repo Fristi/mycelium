@@ -12,7 +12,7 @@ central-run-local:
 [doc("Build central and transfer it to the target and restart and show its output")]
 central-build-roll cfg host:
     just central-build-aarch64
-    just transfer-file {{ cfg }} {{ host }} "edge-central/.env" "~/.env"
+    # just transfer-file {{ cfg }} {{ host }} "edge-central/.env" "~/.env"
     just transfer-file {{ cfg }} {{ host }} "edge-central/target/aarch64-unknown-linux-musl/release/main" "~/central"
     # just execute-remote {{ cfg }} {{ host }} "sudo systemd-run --pty --uid=$(id -u) --gid=$(id -g) --same-dir --setenv RUST_LOG=info --setenv PATH --property "AmbientCapabilities=CAP_NET_ADMIN" ~/central"
 

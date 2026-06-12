@@ -19,7 +19,7 @@ serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 reqwest-middleware = "0.4.2"
-config = "0.14"
+clap = { version = "4", features = ["derive", "env"] }
 dotenv = "0.15.0"
 async-trait = "0.1.88"
 aliri_reqwest = "0.5.1"
