@@ -1,4 +1,4 @@
-use crate::status::{OnboardingDisplay, Status};
+use crate::status::{OnboardingDisplay, Status, SyncSummaryDisplay};
 use embedded_graphics::{
     mono_font::{
         MonoTextStyle, ascii::{FONT_5X7}
@@ -50,6 +50,39 @@ impl Status for I2cStatus {
                 .draw(&mut self.display)
                 .map_err(|e| anyhow::anyhow!("Unable to draw: {:?}", e))?;
         }
+
+        self.display
+            .flush()
+            .map_err(|e| anyhow::anyhow!("Unable to flush display: {:?}", e))?;
+
+        Ok(())
+    }
+
+    fn show_sync_summary(&mut self, display: &SyncSummaryDisplay) -> Result<()> {
+        let style = MonoTextStyle::new(&FONT_5X7, BinaryColor::On);
+
+        self.display
+            .clear(BinaryColor::Off)
+            .map_err(|e| anyhow::anyhow!("Unable to clear display: {:?}", e))?;
+
+        if let Some((current, total)) = display.page {
+            let page_label = format!("{current}/{total}");
+            Text::with_alignment(&page_label, Point::new(128, 0), style, Alignment::Right)
+                .draw(&mut self.display)
+                .map_err(|e| anyhow::anyhow!("Unable to draw: {:?}", e))?;
+        }
+
+        Text::with_alignment(&display.lines[0], Point::new(64, 9), style, Alignment::Center)
+            .draw(&mut self.display)
+            .map_err(|e| anyhow::anyhow!("Unable to draw: {:?}", e))?;
+
+        Text::with_alignment(&display.lines[1], Point::new(64, 17), style, Alignment::Center)
+            .draw(&mut self.display)
+            .map_err(|e| anyhow::anyhow!("Unable to draw: {:?}", e))?;
+
+        Text::with_alignment(&display.lines[2], Point::new(64, 25), style, Alignment::Center)
+            .draw(&mut self.display)
+            .map_err(|e| anyhow::anyhow!("Unable to draw: {:?}", e))?;
 
         self.display
             .flush()

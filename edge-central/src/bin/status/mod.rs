@@ -1,5 +1,7 @@
 #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
 pub mod i2c;
+pub mod display_loop;
+pub mod format;
 pub mod noop;
 
 use anyhow::Result;
@@ -9,8 +11,18 @@ pub struct OnboardingDisplay {
     pub line2: Option<String>,
 }
 
+pub struct SyncSummaryDisplay {
+    pub lines: [String; 3],
+    pub page: Option<(usize, usize)>,
+}
+
 pub trait Status: Send {
     fn show_onboarding(&mut self, display: &OnboardingDisplay) -> Result<()> {
+        let _ = display;
+        Ok(())
+    }
+
+    fn show_sync_summary(&mut self, display: &SyncSummaryDisplay) -> Result<()> {
         let _ = display;
         Ok(())
     }
@@ -20,8 +32,11 @@ pub fn make_status() -> Result<Box<dyn Status>> {
     #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
     {
         let status = i2c::I2cStatus::new("/dev/i2c-3")?;
-        return Ok(Box::new(status));
+        Ok(Box::new(status))
     }
 
-    Ok(Box::new(noop::NoopStatus::new()))
+    #[cfg(not(all(target_os = "linux", target_arch = "aarch64")))]
+    {
+        Ok(Box::new(noop::NoopStatus::new()))
+    }
 }

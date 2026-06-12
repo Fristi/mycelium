@@ -9,6 +9,7 @@ use crate::ports::plant_profiles::PlantProfilePort;
 pub mod btleplug;
 pub mod checkin;
 pub mod random;
+pub mod sync_metrics;
 pub mod types;
 
 pub async fn make_peripheral_sync_stream_provider(

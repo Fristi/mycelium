@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Utc};
+use edge_client_backend::apis::{default_api::CheckinStationError, Error as ApiError};
 use edge_client_backend::models::{
     self, CheckinEvent,
     measurement::Type as MeasurementType,
@@ -31,6 +32,36 @@ pub fn events_to_checkin(events: &Events) -> Result<Vec<CheckinEvent>> {
     }
 
     Ok(checkin_events)
+}
+
+pub fn log_checkin_station_error(
+    err: &ApiError<CheckinStationError>,
+    station_id: &uuid::Uuid,
+    mac: &str,
+    event_count: usize,
+) {
+    match err {
+        ApiError::ResponseError(response) => {
+            tracing::error!(
+                %station_id,
+                %mac,
+                event_count,
+                status = %response.status,
+                body = %response.content,
+                entity = ?response.entity,
+                "station checkin request failed"
+            );
+        }
+        _ => {
+            tracing::error!(
+                %station_id,
+                %mac,
+                event_count,
+                error = %err,
+                "station checkin request failed"
+            );
+        }
+    }
 }
 
 fn measurement_range_to_api(range: &MeasurementRange) -> Result<ApiMeasurement> {
@@ -82,6 +113,7 @@ fn proto_timestamp_to_rfc3339(ts: &Timestamp) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use edge_client_backend::models::CheckinEvent;
     use edge_protocol::v2_proto::{
         Event, Measurement as ProtoMeasurement,
     };
@@ -109,6 +141,27 @@ mod tests {
         });
         watering.r#duration_msec = 15_000;
         watering
+    }
+
+    #[test]
+    fn checkin_event_serializes_with_type_discriminator() {
+        let events = events_to_checkin(&{
+            let mut events = Events::default();
+            events
+                .r#events
+                .push(Event {
+                    r#event: Some(Event_::Event::Measurement(sample_measurement_range())),
+                })
+                .unwrap();
+            events
+        })
+        .unwrap();
+
+        let value = serde_json::to_value(&events).unwrap();
+        let item = value.as_array().unwrap().first().unwrap();
+        assert_eq!(item.get("_type").and_then(|v| v.as_str()), Some("Measurement"));
+        assert!(item.get("soilPf").is_some());
+        assert!(item.get("Measurement").is_none());
     }
 
     #[test]

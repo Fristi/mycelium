@@ -1,6 +1,7 @@
 package co.mycelium.domain
 
 import io.circe.{Decoder, Encoder}
+import io.circe.derivation.Configuration
 
 import java.time.Instant
 
@@ -22,5 +23,7 @@ object CheckinEvent:
       durationMsec: Long
   ) extends CheckinEvent
 
-  given Encoder.AsObject[CheckinEvent] = Encoder.AsObject.derived
-  given Decoder[CheckinEvent]          = Decoder.derived
+  private given Configuration = Configuration.default.withDiscriminator("_type")
+
+  given Encoder.AsObject[CheckinEvent] = Encoder.AsObject.derivedConfigured
+  given Decoder[CheckinEvent]          = Decoder.derivedConfigured
