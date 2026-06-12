@@ -20,9 +20,13 @@ use reqwest_middleware::ClientBuilder;
 use reqwest_tracing::TracingMiddleware;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool};
 use std::{str::FromStr, sync::Arc, time::Duration};
+use chrono::Utc;
+use crate::data::sqlite::{SqliteEdgeStateRepository, SqliteSyncSessionRepository};
+use crate::data::types::SyncSessionRecord;
 use crate::measurements::checkin::events_to_checkin;
+use crate::measurements::sync_metrics::extract_sync_session_metrics;
 use crate::measurements::types::PeripheralSyncResult;
-use crate::data::sqlite::SqliteEdgeStateRepository;
+use crate::ports::plant_profiles::format_mac;
 use crate::cfg::AppConfig;
 use crate::measurements::make_peripheral_sync_stream_provider;
 use crate::onboarding::make_onboarding;
@@ -59,6 +63,7 @@ async fn work() -> anyhow::Result<()> {
     sqlx::migrate!().run(&*pool).await?;
 
     let edge_state_repo = SqliteEdgeStateRepository::new(pool.clone());
+    let sync_session_repo = SqliteSyncSessionRepository::new(pool.clone());
     let _edge_state = match edge_state_repo.get_state().await? {
         Some(state) => state,
         None => {
@@ -122,7 +127,9 @@ async fn work() -> anyhow::Result<()> {
 
     stream
         .for_each(|m| async {
-            if let Err(err) = sync_measurements(&configuration, m).await {
+            if let Err(err) =
+                sync_measurements(&configuration, &sync_session_repo, m).await
+            {
                 tracing::error!("Failed to sync measurements {}", err);
             }
         })
@@ -131,13 +138,14 @@ async fn work() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn sync_measurements(configuration: &Configuration, m: PeripheralSyncResult) -> anyhow::Result<()> {
-    let mac = format!(
-        "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-        m.address[0], m.address[1], m.address[2], m.address[3], m.address[4], m.address[5]
-    );
+async fn sync_measurements(
+    configuration: &Configuration,
+    sync_session_repo: &SqliteSyncSessionRepository,
+    m: PeripheralSyncResult,
+) -> anyhow::Result<()> {
+    let mac = format_mac(&m.address);
 
-    let station_insert = StationInsert::new(mac, "Unnamed".to_string());
+    let station_insert = StationInsert::new(mac.clone(), "Unnamed".to_string());
 
     let station_id = default_api::add_station(configuration, station_insert).await?;
     let checkin_events = events_to_checkin(&m.events)?;
@@ -152,6 +160,25 @@ async fn sync_measurements(configuration: &Configuration, m: PeripheralSyncResul
     )
     .await?;
     tracing::info!(%station_id, inserted, "checkin complete");
+
+    if let Some(metrics) = extract_sync_session_metrics(&m.events) {
+        let record = SyncSessionRecord {
+            synced_at: Utc::now(),
+            station_id: station_id.to_string(),
+            mac,
+            measurement_count: i32::try_from(metrics.measurement_count)?,
+            watering_count: i32::try_from(metrics.watering_count)?,
+            min_battery: metrics
+                .min_battery
+                .map(i32::from),
+            time_drift_secs: m.time_drift.num_seconds(),
+            watered_at: metrics.watered_at,
+        };
+
+        if let Err(err) = sync_session_repo.insert_session(&record).await {
+            tracing::warn!(?err, %station_id, "failed to record sync session metrics");
+        }
+    }
 
     Ok(())
 }
