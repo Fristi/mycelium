@@ -20,10 +20,11 @@ use reqwest_middleware::ClientBuilder;
 use reqwest_tracing::TracingMiddleware;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool};
 use std::{str::FromStr, sync::Arc, time::Duration};
+use tokio::sync::Mutex;
 use chrono::Utc;
 use crate::data::sqlite::{SqliteEdgeStateRepository, SqliteSyncSessionRepository};
 use crate::data::types::SyncSessionRecord;
-use crate::measurements::checkin::events_to_checkin;
+use crate::measurements::checkin::{events_to_checkin, log_checkin_station_error};
 use crate::measurements::sync_metrics::extract_sync_session_metrics;
 use crate::measurements::types::PeripheralSyncResult;
 use crate::ports::plant_profiles::format_mac;
@@ -63,7 +64,7 @@ async fn work() -> anyhow::Result<()> {
     sqlx::migrate!().run(&*pool).await?;
 
     let edge_state_repo = SqliteEdgeStateRepository::new(pool.clone());
-    let sync_session_repo = SqliteSyncSessionRepository::new(pool.clone());
+    let sync_session_repo = Arc::new(SqliteSyncSessionRepository::new(pool.clone()));
     let _edge_state = match edge_state_repo.get_state().await? {
         Some(state) => state,
         None => {
@@ -73,6 +74,14 @@ async fn work() -> anyhow::Result<()> {
             edge_state
         }
     };
+
+    let status = Arc::new(Mutex::new(crate::status::make_status()?));
+    let page_secs = Duration::from_secs(app_config.status_display_page_secs);
+    tokio::spawn(crate::status::display_loop::run_sync_summary_display(
+        Arc::clone(&sync_session_repo),
+        status,
+        page_secs,
+    ));
 
     let jitter_source = jitter::NullJitter;
     let refresh_token = _edge_state.auth0_refresh_token.clone();
@@ -128,7 +137,7 @@ async fn work() -> anyhow::Result<()> {
     stream
         .for_each(|m| async {
             if let Err(err) =
-                sync_measurements(&configuration, &sync_session_repo, m).await
+                sync_measurements(&configuration, sync_session_repo.as_ref(), m).await
             {
                 tracing::error!("Failed to sync measurements {}", err);
             }
@@ -153,19 +162,11 @@ async fn sync_measurements(
         return Ok(());
     }
 
-    let inserted = default_api::checkin_station(
-        configuration,
-        &station_id.to_string(),
-        Some(checkin_events),
-    )
-    .await?;
-    tracing::info!(%station_id, inserted, "checkin complete");
-
     if let Some(metrics) = extract_sync_session_metrics(&m.events) {
         let record = SyncSessionRecord {
             synced_at: Utc::now(),
             station_id: station_id.to_string(),
-            mac,
+            mac: mac.clone(),
             measurement_count: i32::try_from(metrics.measurement_count)?,
             watering_count: i32::try_from(metrics.watering_count)?,
             min_battery: metrics
@@ -179,6 +180,21 @@ async fn sync_measurements(
             tracing::warn!(?err, %station_id, "failed to record sync session metrics");
         }
     }
+
+    let event_count = checkin_events.len();
+    let inserted = default_api::checkin_station(
+        configuration,
+        &station_id.to_string(),
+        Some(checkin_events),
+    )
+    .await
+    .map_err(|err| {
+        log_checkin_station_error(&err, &station_id, &mac, event_count);
+        err
+    })?;
+    tracing::info!(%station_id, inserted, "checkin complete");
+
+
 
     Ok(())
 }

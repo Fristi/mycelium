@@ -45,6 +45,7 @@ pub struct AppConfig {
     pub onboarding_strategy: OnboardingStrategy,
     pub peripheral_sync_mode: PeripheralSyncMode,
     pub plant_profiles_sync_interval_secs: u64,
+    pub status_display_page_secs: u64,
     pub auth0: Auth0Config,
     pub wifi: Option<WifiConfig>,
     /// How BLE onboarding applies WiFi credentials (default: noop).
@@ -92,6 +93,12 @@ struct AppConfigParser {
         default_value_t = 60
     )]
     plant_profiles_sync_interval_secs: u64,
+    #[arg(
+        long,
+        env = "APP.STATUS_DISPLAY_PAGE_SECS",
+        default_value_t = 10
+    )]
+    status_display_page_secs: u64,
     #[arg(long, env = "APP.WIFI_PROVISIONER", default_value = "noop")]
     wifi_provisioner: WifiProvisionerMode,
     #[arg(long, env = "APP.WIFI_INTERFACE")]
@@ -118,6 +125,7 @@ impl TryFrom<AppConfigParser> for AppConfig {
             onboarding_strategy: parser.onboarding_strategy,
             peripheral_sync_mode: parser.peripheral_sync_mode,
             plant_profiles_sync_interval_secs: parser.plant_profiles_sync_interval_secs,
+            status_display_page_secs: parser.status_display_page_secs,
             auth0: Auth0Config {
                 domain: parser.auth0.domain,
                 client_id: parser.auth0.client_id,
