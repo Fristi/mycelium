@@ -4,6 +4,17 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
+[features]
+default = ["hardware"]
+sim = [
+    "edge-protocol/gatt",
+    "dep:trouble-host",
+    "dep:bt-hci",
+    "dep:embedded-io",
+    "dep:embedded-io-async",
+]
+hardware = ["edge-protocol/gatt", "dep:esp-radio", "dep:trouble-host", "esp-rtos/esp-radio"]
+
 [dependencies]
 anyhow = { version = "1.0", default-features = false }
 chrono = { version = "0.4.41", default-features = false }
@@ -11,7 +22,7 @@ nb = "1.1.0"
 shtcx2 = "0.1"
 bh1730fvc = "0.2"
 timeseries = { git = "https://github.com/Fristi/timeseries", rev = "869521bb62a99a101e8f0f7d60fadac2a2a046ba" }
-edge-protocol = { path = "../edge-protocol", features = ["gatt"] }
+edge-protocol = { path = "../edge-protocol" }
 heapless = "0.8"
 log = "0.4.29"
 
@@ -23,15 +34,18 @@ embassy-time = "0.5.0"
 embassy-futures = "0.1.2"
 embassy-sync = "0.7.2"
 static_cell = "2.1.1"
-trouble-host = { version = "0.6.0", features = ["default-packet-pool-mtu-255"] }
+trouble-host = { version = "0.6.0", features = ["default-packet-pool-mtu-255"], optional = true }
+bt-hci = { version = "0.8", features = ["uuid"], optional = true }
+embedded-io = { version = "0.7", optional = true }
+embedded-io-async = { version = "0.7", optional = true }
 
 esp-bootloader-esp-idf = { version = "0.5.0", features = ["esp32"] }
 esp-backtrace = { version = "0.19.0", features = ["panic-handler", "println", "esp32"] }
 esp-hal = { version = "1.1.1", features = ["unstable", "esp32", "log-04"] }
 esp-alloc = { version = "0.10.0" }
 esp-println = { version = "0.17.0", features = ["log-04", "esp32"] }
-esp-radio = { version = "0.18.0", features = ["ble", "log-04", "unstable", "esp32"] }
-esp-rtos = { version = "0.3.0", features = ["embassy", "esp-alloc", "esp-radio", "log-04", "esp32"] }
+esp-radio = { version = "0.18.0", features = ["ble", "log-04", "unstable", "esp32"], optional = true }
+esp-rtos = { version = "0.3.0", features = ["embassy", "esp-alloc", "log-04", "esp32"] }
 embedded-hal-compat = "0.13"
 
 [profile.dev]

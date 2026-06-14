@@ -1,0 +1,6 @@
+[wokwi]
+version = 1
+elf = "target/xtensa-esp32-none-elf/release/edge-peripheral"
+firmware = "target/xtensa-esp32-none-elf/release/edge-peripheral"
+gdbServerPort = 3333
+rfc2217ServerPort = 4000

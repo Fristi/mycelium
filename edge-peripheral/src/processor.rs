@@ -2,6 +2,7 @@ use core::cell::RefCell;
 
 use esp_hal::analog::adc::{Adc, AdcConfig};
 use esp_hal::clock::CpuClock;
+#[cfg(not(feature = "sim"))]
 use esp_hal::efuse::{self, InterfaceMacAddress};
 use esp_hal::gpio::{Output, OutputConfig};
 use esp_hal::interrupt::software::SoftwareInterruptControl;
@@ -9,9 +10,12 @@ use esp_hal::peripherals::GPIO34;
 use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::timer::timg::TimerGroup;
+
+#[cfg(not(feature = "sim"))]
 use esp_radio::ble::controller::BleConnector;
 
 use log::info;
+#[cfg(feature = "hardware")]
 use trouble_host::prelude::ExternalController;
 
 use crate::battery::BatteryMeasurement;
@@ -19,6 +23,7 @@ use crate::gauge::Gauge;
 use crate::state::{DeviceState, DeviceStateData};
 use crate::utils::anyhow::ResultAny;
 use crate::utils::rtc::RtcExt;
+#[cfg(not(feature = "sim"))]
 use crate::{ble, state};
 
 pub struct ProcessorResult {
@@ -26,6 +31,7 @@ pub struct ProcessorResult {
     pub rtc: esp_hal::rtc_cntl::Rtc<'static>,
 }
 
+#[cfg(not(feature = "sim"))]
 pub trait Processor {
     async fn awaiting_time_sync(
         &self,
@@ -53,14 +59,17 @@ pub trait Processor {
     ) -> anyhow::Result<DeviceState>;
 }
 
+#[cfg(not(feature = "sim"))]
 pub struct DebugProcessor;
 
+#[cfg(not(feature = "sim"))]
 impl DebugProcessor {
     pub fn new() -> Self {
         Self {}
     }
 }
 
+#[cfg(not(feature = "sim"))]
 impl Processor for DebugProcessor {
     async fn awaiting_time_sync(
         &self,
@@ -74,7 +83,7 @@ impl Processor for DebugProcessor {
         info!("Awaiting time sync ... ");
 
         let session = ble::GattSyncSession::init_with_mac(mac);
-        let station_state = ble::run(controller, &session, Some(rtc))
+        let _station_state = ble::run(controller, &session, Some(rtc))
             .await
             .map_err(|e| anyhow::anyhow!("BLE time sync failed: {e:?}"))?;
 
@@ -140,6 +149,57 @@ impl Processor for DebugProcessor {
     }
 }
 
+struct GaugeSetup<'a> {
+    gauge: Gauge<'a, GPIO34<'a>>,
+    rng: Rng,
+}
+
+macro_rules! setup_gauge {
+    ($peripherals:ident) => {{
+        let adc_pin = $peripherals.GPIO34;
+        let mut adc_config = AdcConfig::new();
+        let pin = adc_config.enable_pin(adc_pin, esp_hal::analog::adc::Attenuation::_11dB);
+        let adc = Adc::new($peripherals.ADC1, adc_config);
+        let output_config_pcb = OutputConfig::default();
+
+        let pcb_pwr = Output::new(
+            $peripherals.GPIO23,
+            esp_hal::gpio::Level::High,
+            output_config_pcb,
+        );
+
+        let i2c_pcb = esp_hal::i2c::master::I2c::new(
+            $peripherals.I2C0,
+            esp_hal::i2c::master::Config::default(),
+        )
+        .with_anyhow("Failed to init i2c pcb")?
+        .with_sda($peripherals.GPIO21)
+        .with_scl($peripherals.GPIO22);
+
+        let i2c_pcb_refcell = RefCell::new(i2c_pcb);
+
+        let i2c_ext = esp_hal::i2c::master::I2c::new(
+            $peripherals.I2C1,
+            esp_hal::i2c::master::Config::default(),
+        )
+        .with_anyhow("Failed to init i2c ext")?
+        .with_sda($peripherals.GPIO27)
+        .with_scl($peripherals.GPIO26);
+
+        let i2c_ext_refcell = RefCell::new(i2c_ext);
+
+        let battery = BatteryMeasurement::new(adc, pin);
+        GaugeSetup {
+            gauge: Gauge::new(i2c_pcb_refcell, i2c_ext_refcell, pcb_pwr, battery),
+            rng: Rng::new(),
+        }
+    }};
+}
+
+#[cfg(feature = "sim")]
+const SIM_EPOCH_SECS: u32 = 1_700_000_000;
+
+#[cfg(not(feature = "sim"))]
 pub async fn process<P: Processor>(
     state: &DeviceState,
     processor: P,
@@ -156,13 +216,13 @@ pub async fn process<P: Processor>(
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
+    let rtc = Rtc::new(peripherals.LPWR);
+
     let mac_addr = efuse::interface_mac_address(InterfaceMacAddress::Bluetooth);
     let mac: [u8; 6] = mac_addr
         .as_bytes()
         .try_into()
         .map_err(|_| anyhow::anyhow!("Invalid MAC address length"))?;
-    let rtc = Rtc::new(peripherals.LPWR);
-    let rng = Rng::new();
 
     match state {
         DeviceState::AwaitingTimeSync => {
@@ -172,98 +232,86 @@ pub async fn process<P: Processor>(
             let controller = ExternalController::new(connector);
 
             let next_state = processor.awaiting_time_sync(&rtc, mac, controller).await?;
-            let processor_result = ProcessorResult { next_state, rtc };
-
-            Ok(processor_result)
+            Ok(ProcessorResult { next_state, rtc })
         }
         DeviceState::Buffering(data) => {
-            let adc_pin = peripherals.GPIO34;
-            let mut adc_config = AdcConfig::new();
-            let pin = adc_config.enable_pin(adc_pin, esp_hal::analog::adc::Attenuation::_11dB);
-            let adc = Adc::new(peripherals.ADC1, adc_config);
-            let output_config_pcb = OutputConfig::default();
-
-            let pcb_pwr = Output::new(
-                peripherals.GPIO23,
-                esp_hal::gpio::Level::High,
-                output_config_pcb,
-            );
-
-            let i2c_pcb = esp_hal::i2c::master::I2c::new(
-                peripherals.I2C0,
-                esp_hal::i2c::master::Config::default(),
-            )
-            .with_anyhow("Failed to init i2c pcb")?
-            .with_sda(peripherals.GPIO21)
-            .with_scl(peripherals.GPIO22);
-
-            let i2c_pcb_refcell = RefCell::new(i2c_pcb);
-
-            let i2c_ext = esp_hal::i2c::master::I2c::new(
-                peripherals.I2C1,
-                esp_hal::i2c::master::Config::default(),
-            )
-            .with_anyhow("Failed to init i2c ext")?
-            .with_sda(peripherals.GPIO27)
-            .with_scl(peripherals.GPIO26);
-
-            let i2c_ext_refcell = RefCell::new(i2c_ext);
-
-            let battery = BatteryMeasurement::new(adc, pin);
-            let mut gauge = Gauge::new(i2c_pcb_refcell, i2c_ext_refcell, pcb_pwr, battery);
-
-            let next_state = processor.buffering(&data, &rtc, &mut gauge, rng).await?;
-            let processor_result = ProcessorResult { next_state, rtc };
-
-            Ok(processor_result)
+            let mut setup = setup_gauge!(peripherals);
+            let next_state = processor
+                .buffering(&data, &rtc, &mut setup.gauge, setup.rng)
+                .await?;
+            Ok(ProcessorResult { next_state, rtc })
         }
         DeviceState::Flush(data) => {
-            let adc_pin = peripherals.GPIO34;
-            let mut adc_config = AdcConfig::new();
-            let pin = adc_config.enable_pin(adc_pin, esp_hal::analog::adc::Attenuation::_11dB);
-            let adc = Adc::new(peripherals.ADC1, adc_config);
-            let output_config_pcb = OutputConfig::default();
-
-            let pcb_pwr = Output::new(
-                peripherals.GPIO23,
-                esp_hal::gpio::Level::High,
-                output_config_pcb,
-            );
-
-            let i2c_pcb = esp_hal::i2c::master::I2c::new(
-                peripherals.I2C0,
-                esp_hal::i2c::master::Config::default(),
-            )
-            .with_anyhow("Failed to init i2c pcb")?
-            .with_sda(peripherals.GPIO21)
-            .with_scl(peripherals.GPIO22);
-
-            let i2c_pcb_refcell = RefCell::new(i2c_pcb);
-
-            let i2c_ext = esp_hal::i2c::master::I2c::new(
-                peripherals.I2C1,
-                esp_hal::i2c::master::Config::default(),
-            )
-            .with_anyhow("Failed to init i2c ext")?
-            .with_sda(peripherals.GPIO27)
-            .with_scl(peripherals.GPIO26);
-
-            let i2c_ext_refcell = RefCell::new(i2c_ext);
-
-            let battery = BatteryMeasurement::new(adc, pin);
-            let mut gauge = Gauge::new(i2c_pcb_refcell, i2c_ext_refcell, pcb_pwr, battery);
-
             let bluetooth = peripherals.BT;
+            let mut setup = setup_gauge!(peripherals);
             let connector = BleConnector::new(bluetooth, Default::default())
                 .map_err(|e| anyhow::anyhow!("Failed to init BLE: {e:?}"))?;
             let controller = ExternalController::new(connector);
 
             let next_state = processor
-                .flushing(&data, &rtc, &mut gauge, mac, controller, rng)
+                .flushing(&data, &rtc, &mut setup.gauge, mac, controller, setup.rng)
                 .await?;
-            let processor_result = ProcessorResult { next_state, rtc };
+            Ok(ProcessorResult { next_state, rtc })
+        }
+    }
+}
 
-            Ok(processor_result)
+#[cfg(feature = "sim")]
+pub const SIM_MAC: [u8; 6] = [0x02, 0x12, 0x34, 0x56, 0x78, 0x9a];
+
+#[cfg(feature = "sim")]
+pub async fn process_sim(
+    state: &DeviceState,
+    processor: crate::sim_processor::SimProcessor,
+) -> anyhow::Result<ProcessorResult> {
+    let cpu_clock = match state {
+        DeviceState::AwaitingTimeSync | DeviceState::Flush(_) => CpuClock::max(),
+        DeviceState::Buffering(_) => CpuClock::_80MHz,
+    };
+
+    esp_println::logger::init_logger_from_env();
+    let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(cpu_clock));
+    esp_alloc::heap_allocator!(size: 72 * 1024);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+
+    let rtc = Rtc::new(peripherals.LPWR);
+
+    if rtc.current_time_us() == 0 {
+        rtc.set_unix_timestamp(SIM_EPOCH_SECS);
+    }
+
+    match state {
+        DeviceState::AwaitingTimeSync => {
+            let uart1 = peripherals.UART1;
+            let tx = peripherals.GPIO17;
+            let rx = peripherals.GPIO16;
+            let controller = crate::hci_uart::init_hci_uart(uart1, tx, rx)?;
+
+            let next_state = processor
+                .awaiting_time_sync(&rtc, SIM_MAC, controller)
+                .await?;
+            Ok(ProcessorResult { next_state, rtc })
+        }
+        DeviceState::Buffering(data) => {
+            let mut setup = setup_gauge!(peripherals);
+            let next_state = processor
+                .buffering(&data, &rtc, &mut setup.gauge, setup.rng)
+                .await?;
+            Ok(ProcessorResult { next_state, rtc })
+        }
+        DeviceState::Flush(data) => {
+            let uart1 = peripherals.UART1;
+            let tx = peripherals.GPIO17;
+            let rx = peripherals.GPIO16;
+            let mut setup = setup_gauge!(peripherals);
+            let controller = crate::hci_uart::init_hci_uart(uart1, tx, rx)?;
+
+            let next_state = processor
+                .flushing(&data, &rtc, &mut setup.gauge, SIM_MAC, controller, setup.rng)
+                .await?;
+            Ok(ProcessorResult { next_state, rtc })
         }
     }
 }
