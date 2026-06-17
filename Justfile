@@ -45,13 +45,10 @@ edge-peripheral-sim-build:
     . ~/export-esp.sh && cd edge-peripheral && cargo build --target xtensa-esp32-none-elf --release --features sim
 
 edge-peripheral-sim:
-    . ~/export-esp.sh && cd edge-peripheral && cargo build --target xtensa-esp32-none-elf --release --features sim && wokwi-server --chip esp32 --elf target/xtensa-esp32-none-elf/release/edge-peripheral
+    . ~/export-esp.sh && cd edge-peripheral && cargo build --target xtensa-esp32-none-elf --release --features sim && wokwi-server --chip esp32 target/xtensa-esp32-none-elf/release/edge-peripheral
 
 edge-hci-bridge-build:
-    cd edge-hci-bridge && cargo build --release
-
-edge-hci-bridge-run:
-    cd edge-hci-bridge && RUST_LOG=info cargo run --release -- --port /tmp/mycelium-hci --baud 115200
+    cd edge-hci-bridge && cargo build --release --target aarch64-unknown-linux-musl
 
 edge-peripheral-sim-e2e-doc:
     @echo "See edge-peripheral/docs/ble-hci-uart.md"

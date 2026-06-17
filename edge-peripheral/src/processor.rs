@@ -14,13 +14,14 @@ use esp_hal::timer::timg::TimerGroup;
 #[cfg(not(feature = "sim"))]
 use esp_radio::ble::controller::BleConnector;
 
+#[cfg(not(feature = "sim"))]
 use log::info;
-#[cfg(feature = "hardware")]
+#[cfg(not(feature = "sim"))]
 use trouble_host::prelude::ExternalController;
 
 use crate::battery::BatteryMeasurement;
 use crate::gauge::Gauge;
-use crate::state::{DeviceState, DeviceStateData};
+use crate::state::DeviceState;
 use crate::utils::anyhow::ResultAny;
 use crate::utils::rtc::RtcExt;
 #[cfg(not(feature = "sim"))]
@@ -261,6 +262,35 @@ pub const SIM_MAC: [u8; 6] = [0x02, 0x12, 0x34, 0x56, 0x78, 0x9a];
 
 #[cfg(feature = "sim")]
 pub async fn process_sim(
+    state: &DeviceState,
+    processor: crate::sim_processor::SimProcessor,
+) -> anyhow::Result<ProcessorResult> {
+    match state {
+        DeviceState::AwaitingTimeSync => {
+            esp_println::println!(
+                "[sim] AwaitingTimeSync — advertising until central connects"
+            );
+        }
+        DeviceState::Buffering(data) => {
+            esp_println::println!(
+                "[sim] Buffering {}/{} measurements — not advertising",
+                data.measurements.buckets.len(),
+                crate::state::MAX_ENTRIES_MEASUREMENTS
+            );
+        }
+        DeviceState::Flush(data) => {
+            esp_println::println!(
+                "[sim] Flush {} measurement(s) — advertising for sync",
+                data.measurements.buckets.len()
+            );
+        }
+    }
+
+    process_sim_inner(state, processor).await
+}
+
+#[cfg(feature = "sim")]
+async fn process_sim_inner(
     state: &DeviceState,
     processor: crate::sim_processor::SimProcessor,
 ) -> anyhow::Result<ProcessorResult> {

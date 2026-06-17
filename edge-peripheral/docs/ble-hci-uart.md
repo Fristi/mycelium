@@ -1,35 +1,26 @@
-# BLE over UART — Linux sim E2E
+# BLE over UART — Wokwi + Lima VM E2E
 
-Run the Wokwi `edge-peripheral` simulator with real BLE GATT sync through a Linux HCI bridge and unchanged `edge-central`.
+Run the Wokwi `edge-peripheral` simulator with BLE HCI forwarded into a Lima Linux VM through `/dev/vhci`, then scan from BlueZ tools.
 
 ## Architecture
 
 ```
 Wokwi ESP (sim firmware, trouble-host + GATT)
-  UART0 → serial monitor (logs)
   UART1 GPIO16/17 → HCI H4
-       ↓ socat PTY or Wokwi RFC2217
-edge-hci-bridge (HCI controller emulator + BlueZ peripheral)
-       ↓ BlueZ
-edge-central (btleplug, unchanged)
+       ↓ Wokwi RFC2217 :4000 (host side)
+       ↓ socat PTY link (/tmp/mycelium-hci)
+edge-hci-bridge.py (host side, forwards H4 to /dev/vhci)
+       ↓ Linux kernel vhci (inside Lima VM)
+       ↓ BlueZ tools (bluetoothctl, btmon, hcitool)
 ```
 
-## Prerequisites (Linux)
+## Prerequisites
 
-- BlueZ (`bluetoothd` running)
-- User in `bluetooth` group (or run bridge with appropriate permissions)
 - Wokwi VS Code extension for simulation
-- `socat` for PTY bridging
-
-## Build
-
-```bash
-# ESP sim firmware (requires ESP Rust toolchain)
-just edge-peripheral-sim-build
-
-# Linux HCI bridge
-just edge-hci-bridge-build
-```
+- A running Lima VM with BlueZ tooling available
+- `socat` on the host
+- Python bridge dependencies installed (`/opt/bumble-venv/bin/python` used below)
+- Access to `/dev/vhci` on the host (`sudo chmod 666 /dev/vhci`)
 
 ## Run
 
@@ -37,62 +28,74 @@ just edge-hci-bridge-build
 
 Open `edge-peripheral/` in VS Code and start the Wokwi simulator (`just edge-peripheral-sim` or F1 → Wokwi: Start Simulator).
 
-UART0 (`esp:TX`/`esp:RX`) shows firmware logs. UART1 (GPIO16/17) carries binary HCI.
+UART1 (GPIO16/17) is wired to `$serialMonitor`, so Wokwi RFC2217 port `4000` carries binary HCI.
+Because UART1 is used for HCI transport, you should not expect normal text logs on that UART.
 
-### 2. Bridge UART1 to a PTY
+### 2. Start Lima VM
 
-If Wokwi exposes HCI on a second serial monitor (`$serialMonitor:hci`), attach socat to the Wokwi RFC2217 port for UART1 when available. Until dual RFC2217 is configured, route UART1 through the Wokwi **hci** serial monitor tab and use a TCP-to-PTY bridge.
+Start your Linux VM and ensure BlueZ is available there before wiring transport.
 
-Default console RFC2217 (UART0 logs only):
+### 3. Bridge Wokwi RFC2217 to a PTY
+
+Create a persistent PTY endpoint that other tools can open:
 
 ```bash
-# Port 4000 from edge-peripheral/wokwi.toml — do NOT use for HCI
+socat -d -d -x pty,link=/tmp/mycelium-hci,raw,echo=0 tcp:192.168.5.2:4000
 ```
 
-HCI PTY (adjust TCP target to your Wokwi HCI export):
+This links the VM-reachable Wokwi TCP endpoint to `/tmp/mycelium-hci`.
+
+### 4. Allow vhci access
 
 ```bash
-socat pty,link=/tmp/mycelium-hci,raw,echo=0 tcp:localhost:4001
+sudo chmod 666 /dev/vhci
 ```
 
-### 3. Start edge-hci-bridge
+### 5. Start Python HCI bridge
+
+Run from project root:
 
 ```bash
-just edge-hci-bridge-run
-# or:
-RUST_LOG=info edge-hci-bridge/target/release/edge-hci-bridge --port /tmp/mycelium-hci --baud 115200
+/opt/bumble-venv/bin/python edge-hci-bridge.py --pty /tmp/mycelium-hci --baud 115200 --verbose
 ```
 
 The bridge:
 
 - Answers HCI commands from the ESP host over UART
-- Advertises `Mycelium` on BlueZ when the firmware enables LE advertising
-- Proxies GATT reads/writes to the ESP stack over HCI ACL
+- Creates a virtual HCI path via `/dev/vhci`
+- Exposes activity to Linux BLE tooling in the VM
 
-### 4. Run edge-central
+### 6. Scan in VM with BlueZ
 
-On the same Linux host:
+In the VM:
 
 ```bash
-just central-run-local
+bluetoothctl scan on
 ```
 
-`edge-central` scans for service `0xFFF0` and device name `Mycelium`, then performs time sync and measurement flush as on hardware.
+You should see:
+
+`SetDiscoveryFilter success`
 
 ## UART pin map
 
 | UART | Pins | Purpose |
 |------|------|---------|
-| UART0 | esp:TX / esp:RX | Console logs (`$serialMonitor`) |
-| UART1 | GPIO17 TX / GPIO16 RX | HCI H4 (115200 baud) |
+| UART0 | esp:TX / esp:RX | Not exported in current Wokwi wiring |
+| UART1 | GPIO17 TX / GPIO16 RX | HCI H4 (115200 baud) via `$serialMonitor` and RFC2217 `:4000` |
 
 ## Troubleshooting
 
-- **No H4 traffic**: Confirm `diagram.json` wires GPIO16/17 to the HCI serial monitor and firmware is built with `--features sim`.
-- **Bridge open fails**: Create the PTY first with socat; ensure `/tmp/mycelium-hci` exists.
-- **Advertise permission denied**: Check BlueZ is running and your user can use D-Bus (`bluetooth` group).
-- **Central finds device but sync fails**: ATT handle map in the bridge may need tuning for your trouble-host build; check `RUST_LOG=debug` on the bridge.
+- **No Wokwi logs**: Expected while UART1 is dedicated to HCI transport.
+- **PTY does not appear**: Ensure `socat` is running and `/tmp/mycelium-hci` exists before starting the Python bridge.
+- **`/dev/vhci` permission error**: Run `sudo chmod 666 /dev/vhci` again after reboot.
+- **`scan on` succeeds but no devices found**:
+  1. Keep `edge-hci-bridge.py --verbose` running and check that HCI events are flowing.
+  2. Verify Wokwi is actually reachable on `192.168.5.2:4000` from the host where `socat` runs.
+  3. Confirm the firmware enters an advertising state; if needed restart the simulator to reset stale runtime state.
+  4. Use `btmon` in the VM to verify LE advertising reports are received at the controller level.
+  5. If `btmon` shows no LE reports, the transport path is likely broken before BlueZ (Wokwi RFC2217, `socat`, or bridge configuration).
 
 ## Platform note
 
-Linux only. macOS is not supported for the bridge or `edge-central` BLE path in this workflow.
+This workflow is host+VM specific: Wokwi and bridge run on host, BlueZ scan runs in Lima VM.

@@ -22,6 +22,7 @@ use crate::measurements::types::{PeripheralSyncResult, PeripheralSyncResultStrea
 use crate::ports::plant_profiles::{api_profile_to_proto, PlantProfilePort};
 
 const CONNECT_TIMEOUT: TokioDuration = TokioDuration::from_secs(10);
+const SCAN_DURATION: TokioDuration = TokioDuration::from_secs(5);
 const READ_RETRY_DELAY: TokioDuration = TokioDuration::from_millis(200);
 const READ_RETRIES: usize = 5;
 
@@ -61,17 +62,15 @@ impl PeripheralSyncResultStreamProvider for BtleplugPeripheralSyncResultStreamPr
         let adapter = self.adapter.clone();
         let plant_profiles = self.plant_profiles.clone();
         let stream = futures::stream::unfold((adapter, plant_profiles), |(adapter, plant_profiles)| async move {
-            if let Err(err) = adapter
-                .start_scan(ScanFilter {
-                    services: vec![STATION_SERVICE],
-                })
-                .await
-            {
+            // Scan without a service filter: through the Bumble VHCI bridge the service
+            // UUID may only appear in the scan response, which BlueZ does not always
+            // match against a pre-filter. We filter by local name in sync() instead.
+            if let Err(err) = adapter.start_scan(ScanFilter::default()).await {
                 tracing::error!(?err, "Btleplug error occurred");
                 return None;
             }
 
-            sleep(TokioDuration::from_secs(1)).await;
+            sleep(SCAN_DURATION).await;
 
             let peripherals = adapter.peripherals().await.ok()?;
             let mut results = vec![];
@@ -80,9 +79,12 @@ impl PeripheralSyncResultStreamProvider for BtleplugPeripheralSyncResultStreamPr
                 info!("Error occurred while stop scanning: {:?}", err);
             }
 
-            tracing::info!("Found {:?} peripherals", peripherals);
+            tracing::info!("Found {} peripheral(s) after scan", peripherals.len());
 
             for peripheral in peripherals {
+                let props = peripheral.properties().await.ok().flatten();
+                tracing::debug!(?props, "Discovered peripheral");
+
                 let now = Utc::now();
                 match sync(peripheral, now, plant_profiles.as_ref()).await {
                     Err(err) => tracing::warn!(?err, "Sync error occurred"),
@@ -102,9 +104,12 @@ async fn sync(
     now: DateTime<Utc>,
     plant_profiles: &dyn PlantProfilePort,
 ) -> anyhow::Result<PeripheralSyncResult> {
-    if peripheral.properties().await?.and_then(|p| p.local_name).as_deref() != Some("Mycelium")
-    {
-        return Err(anyhow!("Skipping non-Mycelium peripheral"));
+    let props = peripheral.properties().await?;
+    let local_name = props.as_ref().and_then(|p| p.local_name.as_deref());
+    if local_name != Some("Mycelium") {
+        return Err(anyhow!(
+            "Skipping non-Mycelium peripheral (local_name={local_name:?})"
+        ));
     }
 
     timeout(CONNECT_TIMEOUT, peripheral.connect())

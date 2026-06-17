@@ -28,7 +28,7 @@ async fn make_ble_onboarding(cfg: &AppConfig) -> anyhow::Result<Box<dyn Onboardi
     #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
     {
         let peripheral = ble::BluerOnboardingPeripheral::new().await?;
-        let status = make_status()?;
+        let status = make_status(cfg.status_strategy.clone())?;
         let wifi = wifi::make_wifi_provisioner(
             cfg.wifi_provisioner.clone(),
             cfg.wifi_interface.clone(),
