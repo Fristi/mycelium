@@ -8,7 +8,7 @@ use edge_protocol::v2_proto::{Timestamp, WateringEntry};
 
 use crate::ble;
 use crate::gauge::Gauge;
-use crate::hci_uart::EspUartTransport;
+use crate::hci_uart::UartTransport;
 use crate::state::{DeviceState, DeviceStateData};
 use crate::utils::rtc::RtcExt;
 
@@ -31,7 +31,7 @@ impl SimProcessor {
         &self,
         rtc: &Rtc<'_>,
         mac: [u8; 6],
-        controller: ExternalController<EspUartTransport<'_>, 20>,
+        controller: ExternalController<UartTransport, 20>,
     ) -> anyhow::Result<DeviceState> {
         info!("Sim awaiting time sync over HCI UART ...");
 
@@ -95,7 +95,7 @@ impl SimProcessor {
         _rtc: &Rtc<'_>,
         _gauge: &mut Gauge<'_, GPIO34<'_>>,
         mac: [u8; 6],
-        controller: ExternalController<EspUartTransport<'_>, 20>,
+        controller: ExternalController<UartTransport, 20>,
         _rng: Rng,
     ) -> anyhow::Result<DeviceState> {
         info!(

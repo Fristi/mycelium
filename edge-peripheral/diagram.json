@@ -28,8 +28,9 @@
     }
   ],
   "connections": [
-    [ "esp:17", "$serialMonitor:RX", "", [] ],
-    [ "esp:16", "$serialMonitor:TX", "", [] ],
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "esp:15", "gnd:GND", "green" ],
     [ "esp:21", "plant1:SDA0", "green", [ "h0" ] ],
     [ "esp:22", "plant1:SCL0", "purple", [ "h0" ] ],
     [ "esp:27", "plant1:SDA1", "green", [ "h0" ] ],

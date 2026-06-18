@@ -314,10 +314,10 @@ async fn process_sim_inner(
 
     match state {
         DeviceState::AwaitingTimeSync => {
-            let uart1 = peripherals.UART1;
-            let tx = peripherals.GPIO17;
-            let rx = peripherals.GPIO16;
-            let controller = crate::hci_uart::init_hci_uart(uart1, tx, rx)?;
+            let uart = peripherals.UART0;
+            let tx = peripherals.GPIO1;
+            let rx = peripherals.GPIO3;
+            let controller = crate::hci_uart::init_hci_uart(uart, tx, rx)?;
 
             let next_state = processor
                 .awaiting_time_sync(&rtc, SIM_MAC, controller)
@@ -332,11 +332,11 @@ async fn process_sim_inner(
             Ok(ProcessorResult { next_state, rtc })
         }
         DeviceState::Flush(data) => {
-            let uart1 = peripherals.UART1;
-            let tx = peripherals.GPIO17;
-            let rx = peripherals.GPIO16;
-            let mut setup = setup_gauge!(peripherals);
-            let controller = crate::hci_uart::init_hci_uart(uart1, tx, rx)?;
+            let uart = peripherals.UART0;
+            let tx = peripherals.GPIO1;
+            let rx = peripherals.GPIO3;
+            let controller = crate::hci_uart::init_hci_uart(uart, tx, rx)?;
+            let mut setup = setup_gauge!(peripherals);;
 
             let next_state = processor
                 .flushing(&data, &rtc, &mut setup.gauge, SIM_MAC, controller, setup.rng)

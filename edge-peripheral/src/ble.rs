@@ -117,21 +117,27 @@ where
 
     session.to_service(&server).expect("Unable to set state");
 
-    let res = select(ble_task(runner), async {
-        let conn = advertise("Mycelium", &mut peripheral, &server)
-            .await
-            .map_err(|e| match e {
-                BleHostError::BleHost(err) => err,
-                _ => Error::InvalidState,
-            })?;
-        gatt_events_task(&server, &conn, session, rtc).await?;
-        server.station_service.merge_into(&server, session)
-    })
+    // Poll the peripheral/accept path before the HCI runner so we transition
+    // Connecting -> Connected (and attach the GATT server) before post-MTU ATT
+    // requests are processed; otherwise trouble-host drops them while Connecting.
+    let res = select(
+        async {
+            let conn = advertise("Mycelium", &mut peripheral, &server)
+                .await
+                .map_err(|e| match e {
+                    BleHostError::BleHost(err) => err,
+                    _ => Error::InvalidState,
+                })?;
+            gatt_events_task(&server, &conn, session, rtc).await?;
+            server.station_service.merge_into(&server, session)
+        },
+        ble_task(runner),
+    )
     .await;
 
     match res {
-        embassy_futures::select::Either::Second(Ok(res)) => Ok(res),
-        _ => Err(Error::InvalidState)
+        embassy_futures::select::Either::First(Ok(res)) => Ok(res),
+        _ => Err(Error::InvalidState),
     }
 }
 
@@ -189,21 +195,11 @@ async fn gatt_events_task<P: PacketPool>(
     session: &GattSyncSession,
     rtc: Option<&Rtc<'_>>,
 ) -> Result<(), Error> {
-    let address = mac_address_from_bytes(session.mac).map_err(|_| Error::InvalidValue)?;
-    server.station_service.address.set(server, &address)?;
-    server.station_service.events.set(server, &session.events)?;
-
-    if rtc.is_some() {
-        server
-            .station_service
-            .sync_state
-            .set(server, &SyncState::Ready)?;
-    }
-
     let reason = loop {
         match conn.next().await {
             GattConnectionEvent::Disconnected { reason } => break reason,
             GattConnectionEvent::Gatt { event } => {
+                ensure_session_values(server, session, rtc)?;
                 let reply = match event {
                     GattEvent::Write(write) => {
                         if let Some(rtc) = rtc {
@@ -227,6 +223,25 @@ async fn gatt_events_task<P: PacketPool>(
         }
     };
     info!("[gatt] disconnected: {:?}", reason);
+    Ok(())
+}
+
+fn ensure_session_values(
+    server: &Server<'_>,
+    session: &GattSyncSession,
+    rtc: Option<&Rtc<'_>>,
+) -> Result<(), Error> {
+    let address = mac_address_from_bytes(session.mac).map_err(|_| Error::InvalidValue)?;
+    server.station_service.address.set(server, &address)?;
+    server.station_service.events.set(server, &session.events)?;
+
+    if rtc.is_some() {
+        server
+            .station_service
+            .sync_state
+            .set(server, &SyncState::Ready)?;
+    }
+
     Ok(())
 }
 

@@ -62,9 +62,9 @@ impl PeripheralSyncResultStreamProvider for BtleplugPeripheralSyncResultStreamPr
         let adapter = self.adapter.clone();
         let plant_profiles = self.plant_profiles.clone();
         let stream = futures::stream::unfold((adapter, plant_profiles), |(adapter, plant_profiles)| async move {
-            // Scan without a service filter: through the Bumble VHCI bridge the service
-            // UUID may only appear in the scan response, which BlueZ does not always
-            // match against a pre-filter. We filter by local name in sync() instead.
+            // Scan without a service filter: through the Bumble VHCI bridge BlueZ does not
+            // always match pre-filters against scan-response data. We filter by advertised
+            // service UUID in sync() instead (station service is in adv_data on firmware).
             if let Err(err) = adapter.start_scan(ScanFilter::default()).await {
                 tracing::error!(?err, "Btleplug error occurred");
                 return None;
@@ -105,10 +105,13 @@ async fn sync(
     plant_profiles: &dyn PlantProfilePort,
 ) -> anyhow::Result<PeripheralSyncResult> {
     let props = peripheral.properties().await?;
-    let local_name = props.as_ref().and_then(|p| p.local_name.as_deref());
-    if local_name != Some("Mycelium") {
+    let has_station_service = props
+        .as_ref()
+        .is_some_and(|p| p.services.contains(&STATION_SERVICE));
+    if !has_station_service {
         return Err(anyhow!(
-            "Skipping non-Mycelium peripheral (local_name={local_name:?})"
+            "Skipping peripheral without station service (services={:?})",
+            props.as_ref().map(|p| &p.services)
         ));
     }
 
