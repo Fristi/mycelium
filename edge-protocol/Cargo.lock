@@ -44,6 +44,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "bt-hci"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f3c66fd0a41a3b3a5906847b1bf5516048ce083e24fa9341a0fa31d3b4cd73d"
+dependencies = [
+ "btuuid",
+ "embassy-sync 0.8.0",
+ "embedded-io 0.7.1",
+ "embedded-io-async 0.7.0",
+ "futures-intrusive",
+ "heapless 0.9.3",
+]
+
+[[package]]
 name = "btuuid"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -156,7 +170,8 @@ dependencies = [
  "micropb",
  "micropb-gen",
  "timeseries",
- "trouble-host",
+ "trouble-host 0.6.0",
+ "trouble-host 0.7.0",
 ]
 
 [[package]]
@@ -864,7 +879,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1df7817cead4b83dfbeeaa59736ecbc97c30b21dc3bfc0cc2ce8a6687f70b37a"
 dependencies = [
- "bt-hci",
+ "bt-hci 0.8.1",
  "embassy-futures",
  "embassy-sync 0.7.2",
  "embassy-time",
@@ -873,7 +888,24 @@ dependencies = [
  "heapless 0.9.3",
  "rand_core",
  "static_cell",
- "trouble-host-macros",
+ "trouble-host-macros 0.4.0",
+ "zerocopy",
+]
+
+[[package]]
+name = "trouble-host"
+version = "0.7.0"
+source = "git+https://github.com/embassy-rs/trouble?rev=e98540be50bf9ea8a97e3e45a824a5a55ed62b19#e98540be50bf9ea8a97e3e45a824a5a55ed62b19"
+dependencies = [
+ "bt-hci 0.9.0",
+ "embassy-futures",
+ "embassy-sync 0.8.0",
+ "embassy-time",
+ "embedded-io 0.7.1",
+ "futures",
+ "heapless 0.9.3",
+ "static_cell",
+ "trouble-host-macros 0.5.0",
  "zerocopy",
 ]
 
@@ -882,6 +914,19 @@ name = "trouble-host-macros"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d809ae05f510cf8f1d863749281eb28e049d9ae4ad52d92ea7a0ac068a0e17c"
+dependencies = [
+ "convert_case 0.8.0",
+ "darling",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "uuid",
+]
+
+[[package]]
+name = "trouble-host-macros"
+version = "0.5.0"
+source = "git+https://github.com/embassy-rs/trouble?rev=e98540be50bf9ea8a97e3e45a824a5a55ed62b19#e98540be50bf9ea8a97e3e45a824a5a55ed62b19"
 dependencies = [
  "convert_case 0.8.0",
  "darling",

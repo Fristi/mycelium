@@ -3,6 +3,9 @@
 
 extern crate alloc;
 
+#[cfg(feature = "sim")]
+extern crate trouble_host_sim as trouble_host;
+
 mod processor;
 mod battery;
 mod moisture;

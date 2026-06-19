@@ -7,14 +7,14 @@ license = "MIT OR Apache-2.0"
 [features]
 default = ["hardware"]
 sim = [
-    "edge-protocol/gatt",
-    "dep:trouble-host",
+    "edge-protocol/sim-gatt",
+    "dep:trouble-host-sim",
     "dep:bt-hci",
     "dep:embedded-io",
     "dep:embedded-io-async",
     "dep:embassy-sync-08",
 ]
-hardware = ["edge-protocol/gatt", "dep:esp-radio", "dep:trouble-host", "esp-rtos/esp-radio"]
+hardware = ["edge-protocol/gatt", "dep:trouble-host", "dep:esp-radio", "esp-rtos/esp-radio"]
 
 [dependencies]
 anyhow = { version = "1.0", default-features = false }
@@ -37,7 +37,8 @@ embassy-sync = "0.7.2"
 embassy-sync-08 = { package = "embassy-sync", version = "0.8.0", optional = true }
 static_cell = "2.1.1"
 trouble-host = { version = "0.6.0", features = ["default-packet-pool-mtu-255"], optional = true }
-bt-hci = { version = "0.8", features = ["uuid"], optional = true }
+trouble-host-sim = { package = "trouble-host", git = "https://github.com/embassy-rs/trouble", rev = "e98540be50bf9ea8a97e3e45a824a5a55ed62b19", features = ["default-packet-pool-mtu-255"], optional = true }
+bt-hci = { version = "0.9", features = ["uuid"], optional = true }
 embedded-io = { version = "0.7", optional = true }
 embedded-io-async = { version = "0.7", optional = true }
 
@@ -49,9 +50,6 @@ esp-println = { version = "0.17.0", default-features = false, features = ["log-0
 esp-radio = { version = "0.18.0", features = ["ble", "log-04", "unstable", "esp32"], optional = true }
 esp-rtos = { version = "0.3.0", features = ["embassy", "esp-alloc", "log-04", "esp32"] }
 embedded-hal-compat = "0.13"
-
-[patch.crates-io]
-trouble-host = { path = "vendor/trouble-host" }
 
 [profile.dev]
 opt-level = "s"
