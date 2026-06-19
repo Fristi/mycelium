@@ -58,4 +58,17 @@ object DoobieStationProfileRepository extends StationProfileRepository[Connectio
       INNER JOIN stations s ON s.id = sp.station_id
       WHERE s.user_id = $userId
     """.query[StationPlantProfile].to[List]
+
+  override def getByStationId(stationId: UUID): ConnectionIO[Option[PlantProfile]] =
+    sql"""
+      SELECT sp.name,
+             sp.light_mmol_start, sp.light_mmol_end,
+             sp.light_lux_start, sp.light_lux_end,
+             sp.temperature_start, sp.temperature_end,
+             sp.humidity_start, sp.humidity_end,
+             sp.soil_moisture_start, sp.soil_moisture_end,
+             sp.soil_ec_start, sp.soil_ec_end
+      FROM station_profile sp
+      WHERE sp.station_id = $stationId
+    """.query[PlantProfile].option
 }

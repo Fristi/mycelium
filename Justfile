@@ -1,6 +1,14 @@
 sbc_user := env("SBC_USER", "root")
 sbc_host := env("SBC_HOST", "dietpi")
 
+# Load backend/.env into the environment for all recipes (PREPROV_USER_ID, etc.).
+# Shell env vars still take precedence over the file.
+set dotenv-load
+set dotenv-filename := "backend/.env"
+
+backend_image_tag := env("BACKEND_IMAGE_TAG", "dev")
+backend_image := "markdj/mycelium-backend:" + backend_image_tag
+
 [doc('Build central for linux/aarch64')]
 central-build-aarch64:
     cd edge-central && cargo build --release --target aarch64-unknown-linux-musl
@@ -55,4 +63,38 @@ gen-client-rs:
 
 gen-client-ts-axios:
     just gen-client typescript-axios ts-axios
+
+[doc('Build backend Docker image locally via Jib (loads into local Docker daemon)')]
+backend-build tag='dev':
+    cd backend && sbt -DimageTag={{tag}} jibImageBuild
+
+[doc('Start local stack: timescaledb, minio, backend, preprov')]
+backend-compose-up *args:
+    #!/usr/bin/env bash
+    set -eo pipefail
+    cd backend
+    export BACKEND_IMAGE="${BACKEND_IMAGE:-{{backend_image}}}"
+    export PREPROV_USER_ID="${PREPROV_USER_ID:-local-dev-user}"
+    exec docker compose up --build "$@"
+
+[doc('Build backend via Jib and start local docker-compose stack')]
+backend-dev *args:
+    #!/usr/bin/env bash
+    set -eo pipefail
+    tag="dev-$(date -u +%Y%m%d-%H%M%S)"
+    echo "Building backend image markdj/mycelium-backend:${tag}"
+    cd backend
+    sbt -DimageTag="${tag}" jibImageBuild
+    export BACKEND_IMAGE="markdj/mycelium-backend:${tag}"
+    export PREPROV_USER_ID="${PREPROV_USER_ID:-local-dev-user}"
+    exec docker compose up --build --force-recreate "$@"
+
+[doc('Stop local backend stack')]
+backend-down *args:
+    #!/usr/bin/env bash
+    set -eo pipefail
+    cd backend
+    export BACKEND_IMAGE="${BACKEND_IMAGE:-{{backend_image}}}"
+    export PREPROV_USER_ID="${PREPROV_USER_ID:-local-dev-user}"
+    exec docker compose down "$@"
 

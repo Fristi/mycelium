@@ -3,7 +3,7 @@ package co.mycelium.db
 import cats.effect.IO
 import cats.effect.kernel.Resource
 import co.mycelium.adapters.db.{DoobieStationRepository, DoobieStationWateringRepository}
-import co.mycelium.domain.{CheckinEvent, StationInsert}
+import co.mycelium.domain.{CheckinEvent, MeasurementPeriod, StationInsert}
 import doobie.weaver.*
 import weaver.*
 import doobie.*
@@ -39,6 +39,26 @@ object DoobieStationWateringRepositoryTest extends IOSuite with IOChecker {
         .unique
     } yield {
       expect.eql(count, 2) && expect.eql(rows, 2)
+    }
+
+    program.transact(tx)
+  }
+
+  test("listByPeriod should return waterings within the period window") { implicit tx =>
+    val program = for {
+      id <- DoobieStationRepository.insert(station, now)
+      _ <- DoobieStationWateringRepository.insertMany(
+        id,
+        List(
+          CheckinEvent.Watering(now, 5000L),
+          CheckinEvent.Watering(now.plusSeconds(3600), 3000L)
+        )
+      )
+      waterings <- DoobieStationWateringRepository.listByPeriod(id, MeasurementPeriod.LastTwentyFourHours)
+    } yield {
+      expect.eql(waterings.length, 2) &&
+      expect.eql(waterings.head.durationMsec, 5000L) &&
+      expect.eql(waterings(1).durationMsec, 3000L)
     }
 
     program.transact(tx)

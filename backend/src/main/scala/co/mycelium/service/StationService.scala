@@ -84,9 +84,13 @@ final class StationServiceImpl[F[_]: {Concurrent}](
   ): F[Either[Unit, StationDetails]] =
     repos.stations.findById(stationID, userId).flatMap {
       case Some(station) =>
-        repos.measurements
-          .avg(stationID, period.getOrElse(MeasurementPeriod.LastTwentyFourHours))
-          .map(measurements => Right(StationDetails(station, measurements)))
+        val effectivePeriod = period.getOrElse(MeasurementPeriod.LastTwentyFourHours)
+        for {
+          measurements <- repos.measurements.avg(stationID, effectivePeriod)
+          waterings    <- repos.waterings.listByPeriod(stationID, effectivePeriod)
+          profile      <- repos.stationProfile.getByStationId(stationID)
+          growthPeriods = GrowthPeriodClassifier.classify(measurements, profile, effectivePeriod)
+        } yield Right(StationDetails(station, measurements, waterings, growthPeriods))
       case None =>
         Monad[F].pure(Left(()))
     }
