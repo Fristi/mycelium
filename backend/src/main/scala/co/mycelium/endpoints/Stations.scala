@@ -168,6 +168,11 @@ trait TapirSchemas {
 
   implicit def schemaForInterval[A: Schema]: Schema[Interval[A]] = Schema.derived[Interval[A]]
 
+  implicit val schemaNonProductiveReason: Schema[NonProductiveReason] = Schema.derived
+  implicit val schemaGrowthPeriodKind: Schema[GrowthPeriodKind]      = Schema.derived
+  implicit val schemaGrowthPeriod: Schema[GrowthPeriod]              = Schema.derived
+  implicit val schemaStationWatering: Schema[StationWatering]        = Schema.derived
+
   implicit val codecMeasurementPeriod: Codec[String, MeasurementPeriod, CodecFormat.TextPlain] =
     Codec.string.map(
       Mapping.fromDecode((str: String) =>

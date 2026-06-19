@@ -13,6 +13,7 @@ import scala.annotation.experimental
 trait StationProfileRepository[F[_]] {
   def upsert(profile: PlantProfile, stationId: UUID): F[Int]
   def getPlantProfilesByUserId(userId: String): F[List[StationPlantProfile]]
+  def getByStationId(stationId: UUID): F[Option[PlantProfile]]
 }
 
 object StationProfileRepository {
@@ -21,6 +22,7 @@ object StationProfileRepository {
 
 trait StationWateringRepository[F[_]] {
   def insertMany(stationId: UUID, waterings: List[CheckinEvent.Watering]): F[Int]
+  def listByPeriod(stationId: UUID, period: MeasurementPeriod): F[List[StationWatering]]
 }
 
 object StationWateringRepository {

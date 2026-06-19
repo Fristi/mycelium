@@ -1,3 +1,16 @@
+# Local development stack: TimescaleDB, MinIO, backend API, and seed data.
+#
+# Build the backend image with Jib first (see repo Justfile):
+#   just backend-dev
+#
+# backend-dev tags each build uniquely, e.g. markdj/mycelium-backend:dev-20250619-164500
+#
+# Or manually:
+#   just backend-build
+#   cd backend && docker compose up
+#
+# Set PREPROV_USER_ID to your Auth0 sub so seeded stations appear after login.
+
 services:
   timescaledb:
     image: timescale/timescaledb:latest-pg14
@@ -6,22 +19,68 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - 5432:5432
+      - "5432:5432"
+    volumes:
+      - timescaledb-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mycelium"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
-  s3:
+  minio:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1
     environment:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: miniominio
-      MINIO_ACCESS_KEY: minio
-      MINIO_SECRET_KEY: miniominio
     ports:
-      - 9000:9000
-      - 9001:9001
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
     command: server --console-address ":9001" /data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
+  backend:
+    image: ${BACKEND_IMAGE:-markdj/mycelium-backend:dev}
+    ports:
+      - "8080:8080"
+    environment:
+      PG_HOST: timescaledb
+      PG_PORT: 5432
+      PG_USER: postgres
+      PG_PASS: postgres
+      PG_DB: mycelium
+      S3_HOST: http://minio:9000
+      S3_ACCESS_KEY: minio
+      S3_SECRET_KEY: miniominio
+      PLANT_CLASSIFIER_IMPLEMENTATION: constant
+      PLANT_PROFILER_IMPLEMENTATION: constant
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  preprov:
+    build: ../preprov
+    environment:
+      PG_HOST: timescaledb
+      PG_PORT: 5432
+      PG_USER: postgres
+      PG_PASS: postgres
+      PG_DB: mycelium
+      PREPROV_USER_ID: ${PREPROV_USER_ID:-local-dev-user}
+    depends_on:
+      backend:
+        condition: service_started
+    restart: "no"
+
+volumes:
+  timescaledb-data:
+  minio-data:

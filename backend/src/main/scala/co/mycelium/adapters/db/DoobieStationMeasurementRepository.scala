@@ -34,15 +34,25 @@ object DoobieStationMeasurementRepository extends StationMeasurementRepository[C
       case MeasurementPeriod.LastMonth           => fr"time_bucket('1 day', occurred_on)"
     }
 
-    val limit = period match {
-      case MeasurementPeriod.LastTwentyFourHours => 24
-      case MeasurementPeriod.LastSevenDays       => 7
-      case MeasurementPeriod.LastTwoWeeks        => 14
-      case MeasurementPeriod.LastMonth           => 31
+    val lookback = MeasurementPeriod.lookbackInterval(period)
+
+    // Daily buckets use peak lux / peak temperature so night readings do not
+    // drag aggregates below profile thresholds when classifying growth periods.
+    val aggregates = period match {
+      case MeasurementPeriod.LastTwentyFourHours =>
+        fr"round(avg(battery))::int as battery, avg(temperature) as temperature, avg(humidity) as humidity, avg(lux) as lux, avg(soil_pf) as soil_pf"
+      case _ =>
+        fr"round(avg(battery))::int as battery, max(temperature) as temperature, avg(humidity) as humidity, max(lux) as lux, avg(soil_pf) as soil_pf"
     }
 
-    (fr"SELECT $timeBucket AS \"on\", round(avg(battery))::int as battery, avg(temperature) as temperature, avg(humidity) as humidity, avg(lux) as lux, avg(soil_pf) as soil_pf FROM station_measurements WHERE station_id = $stationId GROUP BY 1 ORDER BY 1 ASC LIMIT $limit")
-      .query[StationMeasurement]
+    (fr"SELECT $timeBucket AS bucket_at, " ++ aggregates ++
+      fr" FROM station_measurements WHERE station_id = $stationId AND occurred_on >= now() - interval " ++
+      Fragment.const(s"'$lookback'") ++
+      fr" GROUP BY 1 ORDER BY 1 ASC")
+      .query[(java.time.Instant, Int, Double, Double, Double, Double)]
+      .map { case (on, battery, temperature, humidity, lux, soilPf) =>
+        StationMeasurement(on, battery, temperature, humidity, lux, soilPf)
+      }
       .to[List]
   }
 }
