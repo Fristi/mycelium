@@ -1,5 +1,8 @@
 #![cfg_attr(not(test), no_std)]
 
+#[cfg(feature = "sim-gatt")]
+extern crate trouble_host_sim as trouble_host;
+
 use timeseries::Deviate;
 
 use crate::v2_proto::Measurement;
@@ -15,7 +18,7 @@ pub mod v2_proto;
 pub mod v2;
 pub mod wire;
 
-#[cfg(feature = "gatt")]
+#[cfg(any(feature = "gatt", feature = "sim-gatt"))]
 pub mod gatt;
 
 impl Deviate for Measurement {

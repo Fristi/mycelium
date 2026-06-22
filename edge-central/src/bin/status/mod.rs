@@ -6,6 +6,8 @@ pub mod noop;
 
 use anyhow::Result;
 
+use crate::cfg::StatusStrategy;
+
 pub struct OnboardingDisplay {
     pub line1: String,
     pub line2: Option<String>,
@@ -28,7 +30,14 @@ pub trait Status: Send {
     }
 }
 
-pub fn make_status() -> Result<Box<dyn Status>> {
+pub fn make_status(strategy: StatusStrategy) -> Result<Box<dyn Status>> {
+    match strategy {
+        StatusStrategy::Noop => Ok(Box::new(noop::NoopStatus::new())),
+        StatusStrategy::I2c => make_i2c_status(),
+    }
+}
+
+fn make_i2c_status() -> Result<Box<dyn Status>> {
     #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
     {
         let status = i2c::I2cStatus::new("/dev/i2c-3")?;
@@ -37,6 +46,6 @@ pub fn make_status() -> Result<Box<dyn Status>> {
 
     #[cfg(not(all(target_os = "linux", target_arch = "aarch64")))]
     {
-        Ok(Box::new(noop::NoopStatus::new()))
+        anyhow::bail!("APP.STATUS_STRATEGY=i2c requires Linux aarch64")
     }
 }

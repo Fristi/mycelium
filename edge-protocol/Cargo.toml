@@ -9,6 +9,7 @@ ignored = ["micropb-gen"]
 [features]
 default = []
 gatt = ["dep:trouble-host"]
+sim-gatt = ["dep:trouble-host-sim"]
 
 [dependencies]
 chrono = { version = "0.4.41", default-features = false }
@@ -16,6 +17,7 @@ timeseries = { git = "https://github.com/Fristi/timeseries", rev = "869521bb62a9
 micropb = { version = "0.4.1", features = ["container-heapless"] }
 heapless = "0.8"
 trouble-host = { version = "0.6.0", optional = true }
+trouble-host-sim = { package = "trouble-host", git = "https://github.com/embassy-rs/trouble", rev = "e98540be50bf9ea8a97e3e45a824a5a55ed62b19", optional = true }
 
 [build-dependencies]
 micropb-gen = "0.4.1"

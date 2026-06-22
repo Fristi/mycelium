@@ -1,0 +1,31 @@
+{
+  "name": "Mycelium Plant Sim",
+  "author": "mycelium",
+  "pins": [
+    "SDA0",
+    "SCL0",
+    "SDA1",
+    "SCL1",
+    "PWR",
+    "WATER",
+    "VCC",
+    "GND"
+  ],
+  "controls": [
+    {
+      "id": "waterBtn",
+      "type": "button",
+      "label": "Water Plant",
+      "target": "WATER"
+    }
+  ],
+  "attrs": [
+    [ "soil_pf_dry", "number", "45" ],
+    [ "soil_pf_wet", "number", "120" ],
+    [ "evap_rate", "number", "2" ],
+    [ "water_amount", "number", "25" ],
+    [ "ambient_temp", "number", "22" ],
+    [ "ambient_humidity", "number", "55" ],
+    [ "ambient_lux", "number", "800" ]
+  ]
+}

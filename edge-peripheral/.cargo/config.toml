@@ -1,6 +1,9 @@
 [target.xtensa-esp32-none-elf]
-# runner = "espflash flash --monitor --chip esp32 --flash-freq 40mhz --flash-mode dio --port /dev/tty.usbserial-54350025201 --log-format defmt"
+# Hardware flash runner (default)
 runner = "espflash flash --monitor --chip esp32 --flash-freq 40mhz --flash-size 4mb --flash-mode dio --port /dev/tty.usbserial-11103"
+
+# Wokwi simulation runner (use: cargo run --release --features sim)
+# runner = "wokwi-server --chip esp32 --elf target/xtensa-esp32-none-elf/release/edge-peripheral"
 
 [build]
 rustflags = [

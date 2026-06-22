@@ -9,7 +9,6 @@ pub mod status;
 use aliri_reqwest::AccessTokenMiddleware;
 use aliri_tokens::{backoff, jitter, sources::{self, oauth2::dto::RefreshTokenCredentialsSource}, ClientId, RefreshToken, TokenLifetimeConfig, TokenWatcher};
 use anyhow::*;
-use dotenv::dotenv;
 use edge_client_backend::{
     apis::{configuration::Configuration, default_api},
     models::StationInsert,
@@ -18,10 +17,10 @@ use futures::{stream, StreamExt};
 use reqwest::{Client, Request, Url};
 use reqwest_middleware::ClientBuilder;
 use reqwest_tracing::TracingMiddleware;
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool};
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use chrono::Utc;
+use crate::data::pool::connect_pool;
 use crate::data::sqlite::{SqliteEdgeStateRepository, SqliteSyncSessionRepository};
 use crate::data::types::SyncSessionRecord;
 use crate::measurements::checkin::{events_to_checkin, log_checkin_station_error};
@@ -49,19 +48,12 @@ async fn main() {
 
 
 async fn work() -> anyhow::Result<()> {
-
-    dotenv()?;
-
     let app_config = AppConfig::from_env()?;
-    let opts = SqliteConnectOptions::from_str(&app_config.database_url)?
-        .create_if_missing(true)
-        .journal_mode(SqliteJournalMode::Wal)
-        .read_only(false);
+    if app_config.database_ephemeral {
+        tracing::info!("using ephemeral in-memory database (no disk writes)");
+    }
 
-    // use in a pool
-    let pool = Arc::new(SqlitePool::connect_with(opts).await?);
-
-    sqlx::migrate!().run(&*pool).await?;
+    let pool = connect_pool(&app_config).await?;
 
     let edge_state_repo = SqliteEdgeStateRepository::new(pool.clone());
     let sync_session_repo = Arc::new(SqliteSyncSessionRepository::new(pool.clone()));
@@ -75,7 +67,7 @@ async fn work() -> anyhow::Result<()> {
         }
     };
 
-    let status = Arc::new(Mutex::new(crate::status::make_status()?));
+    let status = Arc::new(Mutex::new(crate::status::make_status(app_config.status_strategy.clone())?));
     let page_secs = Duration::from_secs(app_config.status_display_page_secs);
     tokio::spawn(crate::status::display_loop::run_sync_summary_display(
         Arc::clone(&sync_session_repo),

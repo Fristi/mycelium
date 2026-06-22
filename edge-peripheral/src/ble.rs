@@ -1,4 +1,4 @@
-use embassy_futures::select::select;
+use embassy_futures::join::join4;
 
 use trouble_host::prelude::*;
 use trouble_host::types::gatt_traits::FromGatt;
@@ -102,11 +102,29 @@ where
     let address: Address = Address::random(session.mac);
     info!("Our address = {:?}", address);
 
-    let mut resources: HostResources<DefaultPacketPool, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> = HostResources::new();
-    let stack = trouble_host::new(controller, &mut resources).set_random_address(address);
+    #[cfg(feature = "sim")]
+    let mut resources: HostResources<C, DefaultPacketPool, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> =
+        HostResources::new();
+    #[cfg(feature = "sim")]
+    let stack = trouble_host::new(controller, &mut resources)
+        .set_random_address(address)
+        .build();
+    #[cfg(feature = "sim")]
+    let runner = stack.runner();
+    #[cfg(feature = "sim")]
+    let mut peripheral = stack.peripheral();
+
+    #[cfg(not(feature = "sim"))]
+    let mut resources: HostResources<DefaultPacketPool, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> =
+        HostResources::new();
+    #[cfg(not(feature = "sim"))]
     let Host {
-        mut peripheral, runner, ..
-    } = stack.build();
+        mut peripheral,
+        runner,
+        ..
+    } = trouble_host::new(controller, &mut resources)
+        .set_random_address(address)
+        .build();
 
     info!("Starting advertising and GATT service");
     let server = Server::new_with_config(GapConfig::Peripheral(PeripheralConfig {
@@ -117,28 +135,54 @@ where
 
     session.to_service(&server).expect("Unable to set state");
 
-    let res = select(ble_task(runner), async {
-        let conn = advertise("Mycelium", &mut peripheral, &server)
-            .await
-            .map_err(|e| match e {
-                BleHostError::BleHost(err) => err,
-                _ => Error::InvalidState,
-            })?;
-        gatt_events_task(&server, &conn, session, rtc).await?;
-        server.station_service.merge_into(&server, session)
-    })
+    // Split RX / TX / control so outbound ACL (GATT replies) is polled while the
+    // handler awaits conn.next() and reply.send(). MTU works without this because
+    // trouble-host answers it inline on RX.
+    let (mut rx, mut ctrl, mut tx) = runner.split();
+
+    let (_, _, _, res) = join4(
+        rx_task(&mut rx),
+        tx_task(&mut tx),
+        ctrl_task(&mut ctrl),
+        async {
+            let conn = advertise("Mycelium", &mut peripheral, &server)
+                .await
+                .map_err(|e| match e {
+                    BleHostError::BleHost(err) => err,
+                    _ => Error::InvalidState,
+                })?;
+            gatt_events_task(&server, &conn, session, rtc).await?;
+            server.station_service.merge_into(&server, session)
+        },
+    )
     .await;
 
     match res {
-        embassy_futures::select::Either::Second(Ok(res)) => Ok(res),
-        _ => Err(Error::InvalidState)
+        Ok(res) => Ok(res),
+        Err(_) => Err(Error::InvalidState),
     }
 }
 
-async fn ble_task<C: Controller, P: PacketPool>(mut runner: Runner<'_, C, P>) {
+async fn rx_task<C: Controller, P: PacketPool>(rx: &mut RxRunner<'_, C, P>) {
     loop {
-        if let Err(e) = runner.run().await {
-            error!("[ble_task] error: {:?}", e);
+        if let Err(e) = rx.run().await {
+            error!("[ble_rx] error: {:?}", e);
+        }
+    }
+}
+
+async fn tx_task<C: Controller, P: PacketPool>(tx: &mut TxRunner<'_, C, P>) {
+    loop {
+        if let Err(e) = tx.run().await {
+            error!("[ble_tx] error: {:?}", e);
+        }
+    }
+}
+
+async fn ctrl_task<C: Controller, P: PacketPool>(ctrl: &mut ControlRunner<'_, C, P>) {
+    loop {
+        if let Err(e) = ctrl.run().await {
+            error!("[ble_ctrl] error: {:?}", e);
         }
     }
 }
@@ -151,6 +195,15 @@ async fn advertise<'values, 'server, C: Controller>(
     let service_uuid = STATION_SERVICE_UUID_16.to_le_bytes();
 
     let mut adv_data = [0u8; 31];
+    #[cfg(feature = "sim")]
+    let adv_len = AdStructure::encode_slice(
+        &[
+            AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
+            AdStructure::CompleteServiceUuids16(&[service_uuid]),
+        ],
+        &mut adv_data[..],
+    )?;
+    #[cfg(not(feature = "sim"))]
     let adv_len = AdStructure::encode_slice(
         &[
             AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
@@ -160,6 +213,15 @@ async fn advertise<'values, 'server, C: Controller>(
     )?;
 
     let mut scan_data = [0u8; 31];
+    #[cfg(feature = "sim")]
+    let scan_len = AdStructure::encode_slice(
+        &[
+            AdStructure::CompleteLocalName(name.as_bytes()),
+            AdStructure::CompleteServiceUuids16(&[service_uuid]),
+        ],
+        &mut scan_data[..],
+    )?;
+    #[cfg(not(feature = "sim"))]
     let scan_len = AdStructure::encode_slice(
         &[
             AdStructure::CompleteLocalName(name.as_bytes()),
@@ -178,8 +240,30 @@ async fn advertise<'values, 'server, C: Controller>(
         )
         .await?;
     info!("[adv] advertising as {name} (service 0x{STATION_SERVICE_UUID_16:04x})");
-    let conn = advertiser.accept().await?.with_attribute_server(server)?;
-    info!("[adv] connection established");
+
+    // advertiser.accept() sets done=true on drop. A pure try_accept loop leaves
+    // done=false and cancels advertising on return, which is not the intended
+    // trouble-host lifecycle. On connect, advertising terminates and
+    // advertise_state.wait() may win the select → Timeout even though the link
+    // is up; recover with try_accept() in that case.
+    let conn = match advertiser.accept().await {
+        Ok(conn) => conn,
+        Err(Error::Timeout) => {
+            info!("[adv] accept timeout — polling for pending connection");
+            loop {
+                if let Some(conn) = peripheral.try_accept() {
+                    break conn;
+                }
+                embassy_futures::yield_now().await;
+            }
+        }
+        Err(e) => return Err(e.into()),
+    };
+
+    let conn = conn.with_attribute_server(server)?;
+    info!("[adv] connection established (att_mtu={})", conn.raw().att_mtu());
+    #[cfg(feature = "sim")]
+    esp_println::println!("[adv] connection established");
     Ok(conn)
 }
 
@@ -189,16 +273,9 @@ async fn gatt_events_task<P: PacketPool>(
     session: &GattSyncSession,
     rtc: Option<&Rtc<'_>>,
 ) -> Result<(), Error> {
-    let address = mac_address_from_bytes(session.mac).map_err(|_| Error::InvalidValue)?;
-    server.station_service.address.set(server, &address)?;
-    server.station_service.events.set(server, &session.events)?;
-
-    if rtc.is_some() {
-        server
-            .station_service
-            .sync_state
-            .set(server, &SyncState::Ready)?;
-    }
+    ensure_session_values(server, session, rtc)?;
+    #[cfg(feature = "sim")]
+    esp_println::println!("[gatt] event loop started");
 
     let reason = loop {
         match conn.next().await {
@@ -221,12 +298,34 @@ async fn gatt_events_task<P: PacketPool>(
                     }
                     other => other.accept()?,
                 };
+                info!("[gatt] replying to ATT request");
+                #[cfg(feature = "sim")]
+                esp_println::println!("[gatt] replying to ATT request");
                 reply.send().await;
             }
             _ => {}
         }
     };
     info!("[gatt] disconnected: {:?}", reason);
+    Ok(())
+}
+
+fn ensure_session_values(
+    server: &Server<'_>,
+    session: &GattSyncSession,
+    rtc: Option<&Rtc<'_>>,
+) -> Result<(), Error> {
+    let address = mac_address_from_bytes(session.mac).map_err(|_| Error::InvalidValue)?;
+    server.station_service.address.set(server, &address)?;
+    server.station_service.events.set(server, &session.events)?;
+
+    if rtc.is_some() {
+        server
+            .station_service
+            .sync_state
+            .set(server, &SyncState::Ready)?;
+    }
+
     Ok(())
 }
 

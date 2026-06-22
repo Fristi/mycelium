@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "author": "mycelium",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    {
+      "type": "chip-mycelium-plant-sim",
+      "id": "plant1",
+      "top": -180,
+      "left": 360,
+      "attrs": {
+        "soil_pf_dry": "45",
+        "soil_pf_wet": "120",
+        "evap_rate": "2",
+        "water_amount": "25",
+        "ambient_temp": "22",
+        "ambient_humidity": "55",
+        "ambient_lux": "800"
+      }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "batt_pot",
+      "top": 220,
+      "left": 40,
+      "attrs": { "value": "75" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "esp:15", "gnd:GND", "green" ],
+    [ "esp:21", "plant1:SDA0", "green", [ "h0" ] ],
+    [ "esp:22", "plant1:SCL0", "purple", [ "h0" ] ],
+    [ "esp:27", "plant1:SDA1", "green", [ "h0" ] ],
+    [ "esp:26", "plant1:SCL1", "purple", [ "h0" ] ],
+    [ "esp:23", "plant1:PWR", "orange", [ "h0" ] ],
+    [ "esp:34", "batt_pot:SIG", "yellow", [ "h0" ] ],
+    [ "batt_pot:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "batt_pot:GND", "esp:GND.2", "black", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}
