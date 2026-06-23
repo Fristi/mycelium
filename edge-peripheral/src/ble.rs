@@ -35,8 +35,8 @@ impl StationService {
     fn merge_into(&self, server: &Server<'_>, base: &GattSyncSession) -> Result<GattSyncSession, Error> {
         Ok(GattSyncSession {
             mac: base.mac,
-            events: Events::default(), // self.events.get(&server)?,
-            current_profile: PlantProfileSetting::default(), // self.current_profile.get(&server)?,
+            events: Events::default(),
+            current_profile: self.current_profile.get(server)?,
             current_time: self.current_time.get(&server)?,
         })
     }
@@ -52,8 +52,7 @@ struct Server {
 pub struct GattSyncSession {
     pub mac: [u8; 6],
     pub events: Events,
-    /// Written by central over GATT; retained for a future plant-profile consumer.
-    #[allow(dead_code)]
+    /// Written by central over GATT; stored in device state after flush.
     pub current_profile: PlantProfileSetting,
     pub current_time: Timestamp,
 }
@@ -206,9 +205,7 @@ async fn gatt_events_task<P: PacketPool>(
             GattConnectionEvent::Gatt { event } => {
                 let reply = match event {
                     GattEvent::Write(write) => {
-                        if let Some(rtc) = rtc {
-                            handle_gatt_write(server, rtc, &write)?;
-                        }
+                        handle_gatt_write(server, rtc, &write)?;
                         write.accept()?
                     }
                     GattEvent::Read(read) => {
@@ -240,9 +237,31 @@ fn refresh_current_time(server: &Server<'_>, rtc: &Rtc<'_>) -> Result<(), Error>
 
 fn handle_gatt_write<P: PacketPool>(
     server: &Server<'_>,
-    rtc: &Rtc<'_>,
+    rtc: Option<&Rtc<'_>>,
     write: &WriteEvent<'_, '_, P>,
 ) -> Result<(), Error> {
+    if write.handle() == server.station_service.current_profile.handle {
+        let profile_setting: PlantProfileSetting = write
+            .value(&server.station_service.current_profile)
+            .map_err(|_| Error::InvalidValue)?;
+        server
+            .station_service
+            .current_profile
+            .set(server, &profile_setting)?;
+        info!("[gatt] plant profile written");
+        return Ok(());
+    }
+
+    let Some(rtc) = rtc else {
+        if write.handle() == server.station_service.sync_state.handle {
+            let state: SyncState = write
+                .value(&server.station_service.sync_state)
+                .map_err(|_| Error::InvalidValue)?;
+            info!("[gatt] sync_state write: {}", state.0);
+        }
+        return Ok(());
+    };
+
     if write.handle() == server.station_service.current_time.handle {
         let ts: Timestamp = write
             .value(&server.station_service.current_time)

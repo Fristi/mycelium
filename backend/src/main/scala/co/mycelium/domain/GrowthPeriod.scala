@@ -6,7 +6,7 @@ import io.circe.{Decoder, Encoder}
 import java.time.Instant
 
 enum NonProductiveReason derives Encoder, Decoder:
-  case HeatStress, LowLight, HighLight, LowHumidity, HighHumidity
+  case HeatStress, LowLight, HighLight, LowHumidity, HighHumidity, LowSoilMoisture, HighSoilMoisture
 
 sealed trait GrowthPeriodKind
 

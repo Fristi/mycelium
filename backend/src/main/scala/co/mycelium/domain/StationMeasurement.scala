@@ -13,7 +13,7 @@ final case class StationMeasurement(
     temperature: Double,
     humidity: Double,
     lux: Double,
-    soilPf: Double
+    soilMoisture: Double
 ) derives Encoder.AsObject,
       Decoder,
       Eq

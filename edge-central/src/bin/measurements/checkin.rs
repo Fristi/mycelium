@@ -86,7 +86,7 @@ fn measurement_range_to_api(range: &MeasurementRange) -> Result<ApiMeasurement> 
         lux: f64::from(measurement.r#lux),
         temperature: f64::from(measurement.r#temperature),
         humidity: f64::from(measurement.r#humidity),
-        soil_pf: f64::from(measurement.r#soil_pf),
+        soil_moisture: f64::from(measurement.r#soil_moisture),
         _type: MeasurementType::Measurement,
     })
 }
@@ -129,7 +129,7 @@ mod tests {
             lux: 1200.5,
             temperature: 22.3,
             humidity: 55.0,
-            soil_pf: 6.2,
+            soil_moisture: 35.0,
         });
         range
     }
@@ -160,7 +160,7 @@ mod tests {
         let value = serde_json::to_value(&events).unwrap();
         let item = value.as_array().unwrap().first().unwrap();
         assert_eq!(item.get("_type").and_then(|v| v.as_str()), Some("Measurement"));
-        assert!(item.get("soilPf").is_some());
+        assert!(item.get("soilMoisture").is_some());
         assert!(item.get("Measurement").is_none());
     }
 
@@ -202,7 +202,7 @@ mod tests {
         assert!((measurement.lux - 1200.5).abs() < 1e-3);
         assert!((measurement.temperature - 22.3).abs() < 1e-3);
         assert!((measurement.humidity - 55.0).abs() < 1e-3);
-        assert!((measurement.soil_pf - 6.2).abs() < 1e-3);
+        assert!((measurement.soil_moisture - 35.0).abs() < 1e-3);
 
         let CheckinEvent::Watering(watering) = &checkin[1] else {
             panic!("expected watering event");

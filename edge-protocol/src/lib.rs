@@ -14,7 +14,6 @@ use crate::v2_proto::Measurement;
 pub mod v2_proto;
 pub mod v2;
 pub mod wire;
-
 #[cfg(feature = "gatt")]
 pub mod gatt;
 
@@ -24,6 +23,7 @@ impl Deviate for Measurement {
             || (self.humidity - other.humidity).abs() > max_deviation.humidity
             || self.battery.abs_diff(other.battery) > max_deviation.battery
             || (self.lux - other.lux).abs() > max_deviation.lux
+            || (self.soil_moisture - other.soil_moisture).abs() > max_deviation.soil_moisture
     }
 }
 
@@ -33,6 +33,6 @@ impl Measurement {
         lux: 100.0,
         temperature: 0.1,
         humidity: 0.1,
-        soil_pf: 0.1,
+        soil_moisture: 1.0,
     };
 }

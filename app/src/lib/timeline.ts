@@ -67,6 +67,10 @@ export function growthPeriodStyle(kind: GrowthPeriodKind): PeriodSegmentStyle {
       return { label: "Low humidity", bgClass: "bg-amber-500", icon: "cloud-rain" };
     case "HighHumidity":
       return { label: "High humidity", bgClass: "bg-amber-500", icon: "cloud-rain" };
+    case "LowSoilMoisture":
+      return { label: "Low soil moisture", bgClass: "bg-amber-600", icon: "cloud-rain" };
+    case "HighSoilMoisture":
+      return { label: "High soil moisture", bgClass: "bg-amber-600", icon: "cloud-rain" };
     default:
       return { label: "Non-productive", bgClass: "bg-amber-500", icon: "thermometer" };
   }

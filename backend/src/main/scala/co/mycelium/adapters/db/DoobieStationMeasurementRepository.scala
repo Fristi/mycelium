@@ -14,11 +14,11 @@ object DoobieStationMeasurementRepository extends StationMeasurementRepository[C
       measurements: List[CheckinEvent.Measurement]
   ): ConnectionIO[Int] =
     Update[(UUID, java.time.Instant, Option[java.time.Instant], Int, Double, Double, Double, Double)](
-      "insert into station_measurements (station_id, occurred_on, ended_on, battery, temperature, humidity, lux, soil_pf) values (?, ?, ?, ?, ?, ?, ?, ?)"
+      "insert into station_measurements (station_id, occurred_on, ended_on, battery, temperature, humidity, lux, soil_moisture) values (?, ?, ?, ?, ?, ?, ?, ?)"
     )
       .updateMany(
         measurements.map(m =>
-          (stationId, m.start, m.end, m.battery, m.temperature, m.humidity, m.lux, m.soilPf)
+          (stationId, m.start, m.end, m.battery, m.temperature, m.humidity, m.lux, m.soilMoisture)
         )
       )
 
@@ -40,9 +40,9 @@ object DoobieStationMeasurementRepository extends StationMeasurementRepository[C
     // drag aggregates below profile thresholds when classifying growth periods.
     val aggregates = period match {
       case MeasurementPeriod.LastTwentyFourHours =>
-        fr"round(avg(battery))::int as battery, avg(temperature) as temperature, avg(humidity) as humidity, avg(lux) as lux, avg(soil_pf) as soil_pf"
+        fr"round(avg(battery))::int as battery, avg(temperature) as temperature, avg(humidity) as humidity, avg(lux) as lux, avg(soil_moisture) as soil_moisture"
       case _ =>
-        fr"round(avg(battery))::int as battery, max(temperature) as temperature, avg(humidity) as humidity, max(lux) as lux, avg(soil_pf) as soil_pf"
+        fr"round(avg(battery))::int as battery, max(temperature) as temperature, avg(humidity) as humidity, max(lux) as lux, avg(soil_moisture) as soil_moisture"
     }
 
     (fr"SELECT $timeBucket AS bucket_at, " ++ aggregates ++
@@ -50,8 +50,8 @@ object DoobieStationMeasurementRepository extends StationMeasurementRepository[C
       Fragment.const(s"'$lookback'") ++
       fr" GROUP BY 1 ORDER BY 1 ASC")
       .query[(java.time.Instant, Int, Double, Double, Double, Double)]
-      .map { case (on, battery, temperature, humidity, lux, soilPf) =>
-        StationMeasurement(on, battery, temperature, humidity, lux, soilPf)
+      .map { case (on, battery, temperature, humidity, lux, soilMoisture) =>
+        StationMeasurement(on, battery, temperature, humidity, lux, soilMoisture)
       }
       .to[List]
   }

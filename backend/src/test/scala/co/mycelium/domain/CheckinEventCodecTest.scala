@@ -19,13 +19,13 @@ object CheckinEventCodecTest extends SimpleIOSuite:
         |    "lux": 1200.5,
         |    "temperature": 22.3,
         |    "humidity": 55.0,
-        |    "soilPf": 6.2
+        |    "soilMoisture": 35.0
         |  }
         |]""".stripMargin
 
     IO.pure {
       val events = decode[List[CheckinEvent]](json).toOption.get
-      val CheckinEvent.Measurement(start, end, battery, lux, temperature, humidity, soilPf) =
+      val CheckinEvent.Measurement(start, end, battery, lux, temperature, humidity, soilMoisture) =
         events.head: @unchecked
 
       expect.all(
@@ -36,7 +36,7 @@ object CheckinEventCodecTest extends SimpleIOSuite:
         lux == 1200.5,
         temperature == 22.3,
         humidity == 55.0,
-        soilPf == 6.2
+        soilMoisture == 35.0
       )
     }
   }

@@ -9,10 +9,10 @@ import {
   PERIOD_OPTIONS,
 } from "../lib/timeline";
 
-type MetricKey = "soilPf" | "temperature" | "lux" | "humidity";
+type MetricKey = "soilMoisture" | "temperature" | "lux" | "humidity";
 
 const METRICS: { key: MetricKey; header: string; label: string }[] = [
-  { key: "soilPf", header: "Soil capacitive", label: "pF" },
+  { key: "soilMoisture", header: "Soil moisture", label: "%" },
   { key: "temperature", header: "Temperature", label: "°C" },
   { key: "lux", header: "Lux", label: "lx" },
   { key: "humidity", header: "Relative humidity", label: "%" },
@@ -32,7 +32,7 @@ type Props = {
 
 export default function MeasurementEventChart(props: Props) {
   const { measurements, waterings, growthPeriods, period, hasProfile, onPeriodChange } = props;
-  const [metric, setMetric] = useState<MetricKey>("soilPf");
+  const [metric, setMetric] = useState<MetricKey>("soilMoisture");
 
   const selected = METRICS.find((m) => m.key === metric) ?? METRICS[0];
 

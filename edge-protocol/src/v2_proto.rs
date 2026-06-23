@@ -777,7 +777,7 @@ pub struct Measurement {
     pub r#lux: f32,
     pub r#temperature: f32,
     pub r#humidity: f32,
-    pub r#soil_pf: f32,
+    pub r#soil_moisture: f32,
 }
 impl Measurement {
     /// Return a reference to `battery`
@@ -868,26 +868,26 @@ impl Measurement {
         self.r#humidity = value.into();
         self
     }
-    /// Return a reference to `soil_pf`
+    /// Return a reference to `soil_moisture`
     #[inline]
-    pub fn r#soil_pf(&self) -> &f32 {
-        &self.r#soil_pf
+    pub fn r#soil_moisture(&self) -> &f32 {
+        &self.r#soil_moisture
     }
-    /// Return a mutable reference to `soil_pf`
+    /// Return a mutable reference to `soil_moisture`
     #[inline]
-    pub fn mut_soil_pf(&mut self) -> &mut f32 {
-        &mut self.r#soil_pf
+    pub fn mut_soil_moisture(&mut self) -> &mut f32 {
+        &mut self.r#soil_moisture
     }
-    /// Set the value of `soil_pf`
+    /// Set the value of `soil_moisture`
     #[inline]
-    pub fn set_soil_pf(&mut self, value: f32) -> &mut Self {
-        self.r#soil_pf = value.into();
+    pub fn set_soil_moisture(&mut self, value: f32) -> &mut Self {
+        self.r#soil_moisture = value.into();
         self
     }
-    /// Builder method that sets the value of `soil_pf`. Useful for initializing the message.
+    /// Builder method that sets the value of `soil_moisture`. Useful for initializing the message.
     #[inline]
-    pub fn init_soil_pf(mut self, value: f32) -> Self {
-        self.r#soil_pf = value.into();
+    pub fn init_soil_moisture(mut self, value: f32) -> Self {
+        self.r#soil_moisture = value.into();
         self
     }
 }
@@ -944,7 +944,7 @@ impl ::micropb::MessageDecode for Measurement {
                     };
                 }
                 5u32 => {
-                    let mut_ref = &mut self.r#soil_pf;
+                    let mut_ref = &mut self.r#soil_moisture;
                     {
                         let val = decoder.decode_float()?;
                         let val_ref = &val;
@@ -1035,7 +1035,7 @@ impl ::micropb::MessageEncode for Measurement {
             }
         }
         {
-            let val_ref = &self.r#soil_pf;
+            let val_ref = &self.r#soil_moisture;
             if *val_ref != 0.0 {
                 encoder.encode_varint32(45u32)?;
                 encoder.encode_float(*val_ref)?;
@@ -1071,7 +1071,7 @@ impl ::micropb::MessageEncode for Measurement {
             }
         }
         {
-            let val_ref = &self.r#soil_pf;
+            let val_ref = &self.r#soil_moisture;
             if *val_ref != 0.0 {
                 size += 1usize + 4;
             }

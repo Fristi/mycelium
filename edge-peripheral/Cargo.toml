@@ -34,6 +34,11 @@ esp-radio = { version = "0.18.0", features = ["ble", "log-04", "unstable", "esp3
 esp-rtos = { version = "0.3.0", features = ["embassy", "esp-alloc", "esp-radio", "log-04", "esp32"] }
 embedded-hal-compat = "0.13"
 
+[features]
+default = ["watering-noop"]
+watering-noop = []
+watering-gpio = []
+
 [profile.dev]
 opt-level = "s"
 
