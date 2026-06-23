@@ -8,6 +8,7 @@ use esp_hal::{analog::adc::AdcChannel, gpio::Output, i2c::master::I2c, Blocking}
 use edge_protocol::v2_proto::Measurement;
 
 use crate::battery::BatteryMeasurement;
+use crate::soil_calibration::pf_to_percent;
 use crate::utils::anyhow::ResultAny;
 use crate::moisture::SoilSensor;
 
@@ -48,7 +49,8 @@ impl <'a, P : AdcChannel> Gauge<'a, P> {
 
         Timer::after_millis(15).await;
 
-        let soil_pf = soil.read().await.with_anyhow("Unable to read soil")?;
+        let soil_pf_raw = soil.read().await.with_anyhow("Unable to read soil")?;
+        let soil_moisture = pf_to_percent(soil_pf_raw) as f32;
 
         let mut bh1730fvc = BH1730FVC::new(&mut delay, &mut i2c_pcb_bh1730fvc)
             .with_anyhow("BH1730FVC init failed")?;
@@ -76,7 +78,7 @@ impl <'a, P : AdcChannel> Gauge<'a, P> {
             lux,
             temperature: measurement.temperature.as_degrees_celsius(),
             humidity: measurement.humidity.as_percent(),
-            soil_pf
+            soil_moisture,
         };
 
         Ok(measurement)

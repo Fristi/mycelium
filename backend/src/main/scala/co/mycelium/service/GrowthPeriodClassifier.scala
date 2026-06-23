@@ -4,8 +4,7 @@ import co.mycelium.domain.*
 
 /** Classifies measurement buckets into productive / non-productive growth periods.
   *
-  * Soil moisture is excluded: profile ranges use % but measurements use soil pF.
-  * Non-productive reason priority when multiple violations: heat > light > humidity.
+  * Non-productive reason priority when multiple violations: heat > light > humidity > soil moisture.
   * Daily buckets are expected to carry peak lux and peak temperature (see repository).
   */
 object GrowthPeriodClassifier {
@@ -40,6 +39,8 @@ object GrowthPeriodClassifier {
     else if m.lux > v.lightLux.end then Some(NonProductiveReason.HighLight)
     else if m.humidity < v.humidity.start then Some(NonProductiveReason.LowHumidity)
     else if m.humidity > v.humidity.end then Some(NonProductiveReason.HighHumidity)
+    else if m.soilMoisture < v.soilMoisture.start then Some(NonProductiveReason.LowSoilMoisture)
+    else if m.soilMoisture > v.soilMoisture.end then Some(NonProductiveReason.HighSoilMoisture)
     else None
 
   private def mergeConsecutive(

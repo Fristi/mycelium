@@ -12,7 +12,7 @@ use edge_protocol::v2::{
     STATION_EVENTS_CHARACTERISTIC_UUID_16, STATION_MAC_ADDR_CHARACTERISTIC_UUID_16,
     STATION_PLANT_PROFILE_CHARACTERISTIC_UUID_16, STATION_SERVICE_UUID_16,
 };
-use edge_protocol::v2_proto::{Events, Timestamp};
+use edge_protocol::v2_proto::{Events, PlantProfileSetting, Timestamp};
 use futures::Stream;
 use tokio::time::{sleep, timeout, Duration as TokioDuration};
 use tracing::info;
@@ -195,9 +195,11 @@ async fn sync_plant_profile(
     use btleplug::api::Peripheral as _;
 
     let proto_profile = api_profile_to_proto(&api_profile.variables);
+    let mut setting = PlantProfileSetting::default();
+    setting.set_profile(proto_profile);
     let mut buf = [0u8; 64];
-    let len = encode_proto(&proto_profile, &mut buf)
-        .map_err(|_| anyhow!("Failed to encode PlantProfile"))?;
+    let len = encode_proto(&setting, &mut buf)
+        .map_err(|_| anyhow!("Failed to encode PlantProfileSetting"))?;
 
     peripheral
         .write(profile_char, &buf[..len], WriteType::WithResponse)

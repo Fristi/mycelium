@@ -27,7 +27,7 @@ message Measurement {
   float  lux         = 2;
   float  temperature = 3;
   float  humidity    = 4;
-  float  soil_pf     = 5;
+  float  soil_moisture = 5;
 }
 
 message MeasurementRange {

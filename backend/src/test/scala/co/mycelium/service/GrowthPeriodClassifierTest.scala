@@ -22,9 +22,10 @@ object GrowthPeriodClassifierTest extends FunSuite {
       on: Instant,
       lux: Double = 500,
       temperature: Double = 22,
-      humidity: Double = 55
+      humidity: Double = 55,
+      soilMoisture: Double = 35
   ): StationMeasurement =
-    StationMeasurement(on, 85, temperature, humidity, lux, 6.0)
+    StationMeasurement(on, 85, temperature, humidity, lux, soilMoisture)
 
   test("returns empty list when no profile") {
     val measurements = List(measurement(Instant.parse("2025-01-01T10:00:00Z")))
@@ -82,6 +83,39 @@ object GrowthPeriodClassifierTest extends FunSuite {
         MeasurementPeriod.LastTwentyFourHours
       )
     expect(result.head.kind == GrowthPeriodKind.NonProductive(NonProductiveReason.HeatStress))
+  }
+
+  test("classifies low soil moisture") {
+    val on = Instant.parse("2025-01-01T10:00:00Z")
+    val result =
+      GrowthPeriodClassifier.classify(
+        List(measurement(on, soilMoisture = 10)),
+        Some(profile),
+        MeasurementPeriod.LastTwentyFourHours
+      )
+    expect(result.head.kind == GrowthPeriodKind.NonProductive(NonProductiveReason.LowSoilMoisture))
+  }
+
+  test("classifies high soil moisture") {
+    val on = Instant.parse("2025-01-01T10:00:00Z")
+    val result =
+      GrowthPeriodClassifier.classify(
+        List(measurement(on, soilMoisture = 70)),
+        Some(profile),
+        MeasurementPeriod.LastTwentyFourHours
+      )
+    expect(result.head.kind == GrowthPeriodKind.NonProductive(NonProductiveReason.HighSoilMoisture))
+  }
+
+  test("humidity takes priority over low soil moisture") {
+    val on = Instant.parse("2025-01-01T10:00:00Z")
+    val result =
+      GrowthPeriodClassifier.classify(
+        List(measurement(on, humidity = 30, soilMoisture = 10)),
+        Some(profile),
+        MeasurementPeriod.LastTwentyFourHours
+      )
+    expect(result.head.kind == GrowthPeriodKind.NonProductive(NonProductiveReason.LowHumidity))
   }
 
   test("merges consecutive buckets with same classification") {

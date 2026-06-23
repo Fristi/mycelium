@@ -12,11 +12,14 @@ pub const MAX_ENTRIES_WATERINGS: usize = 2;
 pub type Measurements = Series<MAX_ENTRIES_MEASUREMENTS, NaiveDateTime, Measurement>;
 pub type Waterings = HVec<WateringEntry, MAX_ENTRIES_WATERINGS>;
 
+pub use crate::watering_policy::WateringContext;
+
 #[derive(Debug, Clone)]
 pub struct DeviceStateData {
     pub measurements: Measurements,
     pub waterings: Waterings,
-    pub plant_profile: Option<PlantProfile>
+    pub plant_profile: Option<PlantProfile>,
+    pub watering_context: WateringContext,
 }
 
 impl DeviceStateData {
@@ -24,7 +27,17 @@ impl DeviceStateData {
         Self {
             measurements: Series::new(Measurement::MAX_DEVIATION),
             waterings: HVec::new(),
-            plant_profile: None
+            plant_profile: None,
+            watering_context: WateringContext::default(),
+        }
+    }
+
+    pub fn clear_buffers(&self) -> Self {
+        Self {
+            measurements: Series::new(Measurement::MAX_DEVIATION),
+            waterings: HVec::new(),
+            plant_profile: self.plant_profile.clone(),
+            watering_context: self.watering_context.clone(),
         }
     }
 

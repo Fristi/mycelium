@@ -15,7 +15,7 @@ object CheckinEvent:
       lux: Double,
       temperature: Double,
       humidity: Double,
-      soilPf: Double
+      soilMoisture: Double
   ) extends CheckinEvent
 
   case class Watering(
